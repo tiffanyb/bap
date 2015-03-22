@@ -254,6 +254,11 @@ module Cmdline = struct
     Term.(pure symbols $print_name $print_size $print_sexp $filename),
     Term.info "symbols" ~doc
 
+  let statistics =
+    let doc = "Output the statistics result along with those by IDA" in
+    Term.(pure statistics $threshold $length $database_in $filename),
+    Term.info "statistics" ~doc
+
   let usage choices =
     eprintf "usage: bap-byteweight [--version] [--help] \
              <command> [<args>]\n";
@@ -273,7 +278,7 @@ module Cmdline = struct
       ~version:Config.pkg_version ~doc ~man
 
   let eval () = Term.eval_choice default
-      [train; find; fetch; install; update; symbols]
+      [train; find; fetch; install; update; symbols; statistics]
 end
 
 let () =
