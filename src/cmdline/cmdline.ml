@@ -5,18 +5,14 @@ let revolt () = print_endline "Revolt!"
 
 let revolt_t = Term.(pure revolt $ pure ())
 
-let count =
-  let doc = "Repeat message $(docv) times." in
-  Arg.(value & opt int 10 & info ["c"; "count"] ~docv:"COUNT" ~doc)
-
 
 let print_source = function
   | `bw -> print_endline "bw"
   | _ -> print_endline "else"
 
 
-let chorus count print_symbols tool gt =
-  List.iter print_symbols ~f:(fun f -> match f with
+let compare print_metrics tool gt : unit =
+  List.iter print_metrics ~f:(fun f -> match f with
     | `with_prec -> print_endline "with_prec"
     | `with_recl -> print_endline "with_recall"
     | `with_F -> print_endline "with_F"
@@ -26,7 +22,6 @@ let chorus count print_symbols tool gt =
   );
   print_source tool;
   print_source gt
-  (* for i = 1 to count do print_endline msg done *)
 
 let source = [
   "BW", `bw;
@@ -40,7 +35,7 @@ let gt : _ Term.t =
   let doc = "The message to print." in
   Arg.(value & pos 1 (enum source) `symbtl & info [] ~docv:"gt" ~doc)
 
-let print_symbols : _ list Term.t =
+let print_metrics : _ list Term.t =
   let opts = [
     "precision", `with_prec;
     "recall", `with_recl;
@@ -54,13 +49,13 @@ let print_symbols : _ list Term.t =
   Arg.(value & opt_all ~vopt:`with_all (enum opts) [] &
       info ["print-metrics"; "p"] ~doc)
 
-let chorus_t = Term.(pure chorus $count $print_symbols $tool $gt)
+let compare_t = Term.(pure compare $print_metrics $tool $gt)
 
 let info =
   let doc = "aaa" in
   let man = [ `S "BUGS"; `P "Email bug reports"; ] in
   Term.info "chorus" ~version:"1.6.1" ~doc ~man
 
-let () = match Term.eval (chorus_t, info) with
+let () = match Term.eval (compare_t, info) with
   | `Error _ -> exit 1
   | _ -> exit 0
