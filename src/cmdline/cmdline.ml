@@ -8,15 +8,22 @@ let print_source = function
 
 let source = [
   "BW", `bw;
-  "SymTbl", `symbtl;]
+  "SymTbl", `symbtl;
+  "User", `user;
+  ]
 
 let tool : _ Term.t =
   let doc = "The message to print." in
-  Arg.(value & pos 0 (enum source) `symbtl & info [] ~docv:"tool" ~doc)
+  Arg.(value & pos 1 (enum source) `symbtl & info [] ~docv:"tool" ~doc)
 
 let gt : _ Term.t =
   let doc = "The message to print." in
-  Arg.(value & pos 1 (enum source) `symbtl & info [] ~docv:"gt" ~doc)
+  Arg.(value & pos 2 (enum source) `symbtl & info [] ~docv:"gt" ~doc)
+
+let symsfile : string option Term.t =
+  let doc = "Use this file as symbols source." in
+  Arg.(value & opt (some non_dir_file) None & info ["syms"; "s"]
+  ~docv:"syms" ~doc)
 
 let print_metrics : _ list Term.t =
   let opts = [
@@ -32,11 +39,20 @@ let print_metrics : _ list Term.t =
   Arg.(value & opt_all ~vopt:`with_all (enum opts) [] &
       info ["print-metrics"; "p"] ~doc)
 
-let func_start source : Addr.Hash_set.t = Addr.Hash_set.create ()
+let bin : string Term.t =
+  let doc = "binary" in
+  Arg.(required & pos 0 (some non_dir_file) None & info [] ~docv:"binary" ~doc)
 
-let compare print_metrics tool gt : unit =
-  let fs_tool = func_start tool in
-  let fs_gt = func_start gt in
+let func_start bin symsfile : _ -> Addr.Hash_set.t = function
+  | `bw -> Printf.printf "asdfasdf"; Func_start.byteweight bin
+  | `user -> (match symsfile with
+    | None -> (* TODO: return error using monad *) Printf.printf "aaa"; Addr.Hash_set.create ()
+    | Some f -> Func_start.usersource f)
+  | _ -> Addr.Hash_set.create ()
+
+let compare bin print_metrics tool gt symsfile : unit =
+  let fs_tool = func_start bin symsfile tool in
+  let fs_gt = func_start bin symsfile gt in
   let fp =
     let set = Hash_set.diff fs_tool fs_gt in
     Hash_set.length set in
@@ -52,8 +68,9 @@ let compare print_metrics tool gt : unit =
   let f_05 = 1.5 *. prec *. recl /. (0.5 *. prec +. recl) in
 
   (* print out the metrics *)
+  (* TODO: pretty printing *)
   if List.mem print_metrics `with_all then
-    print_endline "all"
+    Printf.printf "%f %f %f\n" prec recl f_05
   else List.iter print_metrics ~f:(fun f -> match f with
     | `with_prec -> print_endline "with_prec"
     | `with_recl -> print_endline "with_recall"
@@ -62,7 +79,7 @@ let compare print_metrics tool gt : unit =
     | `with_FN -> print_endline "with_FN"
     | _ -> print_endline "with_prec")
 
-let compare_t = Term.(pure compare $print_metrics $tool $gt)
+let compare_t = Term.(pure compare $bin $print_metrics $tool $gt $symsfile)
 
 let info =
   let doc = "aaa" in
