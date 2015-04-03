@@ -32,4 +32,4 @@ val read_addrset : string -> Addr.Hash_set.t
 
 val write_addrset : ?filename:string -> Addr.Hash_set.t -> unit
 
-val write : ?filename:string -> string table -> unit
+val write : ?filename:string -> symbol table -> unit
