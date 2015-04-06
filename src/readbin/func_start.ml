@@ -2,6 +2,8 @@ open Bap.Std
 open Core_kernel.Std
 open Or_error
 
+exception Bad_user_input
+
 let byteweight bin =
   let tmp = Filename.temp_file "bw_" ".output" in
   Printf.fprintf stderr "%s\n" tmp;
@@ -21,7 +23,9 @@ let symbols bin =
   let cmd = Printf.sprintf "bap-byteweight symbols -x %s > %s" bin tmp in
   Printf.fprintf stderr "%s\n" cmd;
   let _ = Unix.system cmd in
-  Symbols.read_addrset tmp
+  try
+    Symbols.read_addrset tmp
+  with _ -> raise Bad_user_input
 
 let ida bin : Addr.Hash_set.t =
   let roots_of_table t : addr list =
