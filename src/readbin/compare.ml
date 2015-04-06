@@ -3,6 +3,8 @@ open Cmdliner
 open Bap.Std
 open Bap_plugins.Std
 
+exception Not_found
+
 let print_source = function
   | `bw -> print_endline "bw"
   | _ -> print_endline "else"
@@ -36,11 +38,10 @@ let print_metrics : _ list Term.t =
     "TP", `with_TP;
     "FP", `with_FP;
     "FN", `with_FN;
-    "all", `with_all;
   ] in
   let doc = "doc" in
-  Arg.(value & opt_all ~vopt:`with_all (enum opts) [] &
-      info ["print-metrics"; "p"] ~doc)
+  Arg.(value & opt_all (enum opts) (List.map ~f:snd opts) &
+      info ["with-metrics"; "c"] ~doc)
 
 let bin : string Term.t =
   let doc = "binary" in
@@ -49,13 +50,13 @@ let bin : string Term.t =
 let func_start bin symsfile : _ -> Addr.Hash_set.t = function
   | `bw -> Func_start.byteweight bin
   | `user -> (match symsfile with
-    | None -> (* TODO: return error using monad *) Addr.Hash_set.create ()
+    | None -> raise Not_found
     | Some f -> Func_start.usersource f)
   | `symtbl -> Func_start.symbols bin
   | `ida -> Func_start.ida bin
   | _ -> Addr.Hash_set.create ()
 
-let compare bin print_metrics tool gt symsfile : unit =
+let compare bin print_metrics tool gt symsfile : unit = try
   let fs_tool = func_start bin symsfile tool in
   let fs_gt = func_start bin symsfile gt in
   let fp =
@@ -73,21 +74,20 @@ let compare bin print_metrics tool gt symsfile : unit =
   let f_05 = 1.5 *. prec *. recl /. (0.5 *. prec +. recl) in
 
   (* print out the metrics *)
-  let metrics =
-    if List.mem print_metrics `with_all then
-      [`with_prec; `with_recl; `with_F; `with_TP; `with_FP; `with_FN]
-    else print_metrics in
-  let headers, items = List.fold metrics ~init:([], []) ~f:(fun (headers, items) -> function
-    | `with_prec -> "Precision"::headers, (Printf.sprintf "%f" prec)::items
-    | `with_recl -> "Recall"::headers, (Printf.sprintf "%f" recl)::items
-    | `with_F -> "F_05"::headers, (Printf.sprintf "%f" f_05)::items
+  let headers, items = List.fold print_metrics ~init:([], []) ~f:(fun (headers, items) -> function
+    | `with_prec -> "Precision"::headers, (Printf.sprintf "%.2g" prec)::items
+    | `with_recl -> "Recall"::headers, (Printf.sprintf "%.2g" recl)::items
+    | `with_F -> "F_05"::headers, (Printf.sprintf "%.2g" f_05)::items
     | `with_TP -> "TP"::headers, (Printf.sprintf "%d" tp)::items
     | `with_FN -> "FN"::headers, (Printf.sprintf "%d" fn)::items
-    | `with_FP -> "FP"::headers, (Printf.sprintf "%d" fp)::items
-    (* TODO: return error.t *)
-    | _ -> print_endline "error"; headers, items) in
+    | `with_FP -> "FP"::headers, (Printf.sprintf "%d" fp)::items ) in
   (* TODO: pretty printing *)
-  Printf.printf "Tool\t%s\nBW\t%s\t\n" (String.concat ~sep:"\t" headers) (String.concat ~sep:"\t" items)
+  Printf.printf "Tool\t%s\nBW\t%s\t\n" (String.concat ~sep:"\t" headers)
+  (String.concat ~sep:"\t" items)
+  with
+    | Func_start.Bad_user_input ->
+        Printf.printf "Symbol file is in wrong format.\n"
+    | Not_found -> Printf.printf "No Symbol File found.\n"
 
 let compare_t = Term.(pure compare $bin $print_metrics $tool $gt $symsfile)
 
