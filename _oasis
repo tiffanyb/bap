@@ -393,18 +393,18 @@ Executable "bap"
                   re.posix
 
 Executable "bap-byteweight"
-  Path:           src/readbin
-  MainIs:         bap-byteweight.ml
+  Path:           src/byteweight
+  MainIs:         byteweight.ml
   Install:        true
   CompiledObject: best
   BuildDepends:   bap, bap.plugins, cmdliner, fileutils, curl, re.posix
 
-Executable "bap-fsi-benchmark"
+Executable "bap-compare"
   Path:           src/readbin
-  MainIs:         fsi_benchmark.ml
+  MainIs:         compare.ml
   Install:        true
   CompiledObject: best
-  BuildDepends:   bap, bap.plugins, cmdliner, re.posix, fileutils
+  BuildDepends:   bap, bap.plugins, cmdliner, fileutils, curl, re.posix
 
 Executable "bap-mc"
   Path:           src/bap_mc
