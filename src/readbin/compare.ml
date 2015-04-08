@@ -81,7 +81,6 @@ let compare bin print_metrics tool gt symsfile : unit = try
     | `with_TP -> "TP"::headers, (Printf.sprintf "%d" tp)::items
     | `with_FN -> "FN"::headers, (Printf.sprintf "%d" fn)::items
     | `with_FP -> "FP"::headers, (Printf.sprintf "%d" fp)::items ) in
-  (* TODO: pretty printing *)
   Printf.printf "Tool\t%s\nBW\t%s\t\n" (String.concat ~sep:"\t" headers)
   (String.concat ~sep:"\t" items)
   with
