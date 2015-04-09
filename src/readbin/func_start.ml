@@ -13,9 +13,9 @@ let byteweight bin =
   Symbols.read_addrset tmp
 
 let usersource = Symbols.read_addrset
-  (* let s = Addr.Hash_set.of_list [Addr.of_string "0x1234:32"] in
-  Symbols.write_addrset ~filename:f s;
-  Symbols.read_addrset f *)
+(* let s = Addr.Hash_set.of_list [Addr.of_string "0x1234:32"] in
+   Symbols.write_addrset ~filename:f s;
+   Symbols.read_addrset f *)
 
 let symbols bin =
   let tmp = Filename.temp_file "bw_" ".output" in
@@ -33,9 +33,9 @@ let ida bin : Addr.Hash_set.t =
   let res =
     Printf.printf "%s\n%!" bin;
     Image.create bin >>= fun (img, _warns) ->
-      let arch = Image.arch img in
+    let arch = Image.arch img in
     Ida.create ~ida:"idaq64" bin >>| fun ida ->
-      Table.foldi (Image.sections img) ~init:[] ~f:(fun mem sec ida_syms ->
+    Table.foldi (Image.sections img) ~init:[] ~f:(fun mem sec ida_syms ->
         if Section.is_executable sec then
           let ida_syms_t = roots_of_table Ida.(get_symbols ida arch mem) in
           Printf.printf "%d\n" @@ List.length ida_syms_t;
