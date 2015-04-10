@@ -47,18 +47,18 @@ let bin : string Term.t =
   let doc = "binary" in
   Arg.(required & pos 0 (some non_dir_file) None & info [] ~docv:"binary" ~doc)
 
-let func_start bin symsfile : _ -> Addr.Hash_set.t = function
-  | `bw -> Func_start.byteweight bin
+let func_start bin symsfile : _ -> Addr.Hash_set.t * string = function
+  | `bw -> Func_start.byteweight bin, "BW"
   | `user -> (match symsfile with
       | None -> raise Not_found
-      | Some f -> Func_start.usersource f)
-  | `symtbl -> Func_start.symbols bin
-  | `ida -> Func_start.ida bin
-  | _ -> Addr.Hash_set.create ()
+      | Some f -> Func_start.usersource f, "User")
+  | `symtbl -> Func_start.symbols bin, "Symbol"
+  | `ida -> Func_start.ida bin, "IDA"
+  | _ -> Addr.Hash_set.create (), "None"
 
 let compare bin print_metrics tool gt symsfile : unit = try
-    let fs_tool = func_start bin symsfile tool in
-    let fs_gt = func_start bin symsfile gt in
+    let fs_tool, tool_name = func_start bin symsfile tool in
+    let fs_gt, _ = func_start bin symsfile gt in
     let fp =
       let set = Hash_set.diff fs_tool fs_gt in
       Hash_set.length set in
@@ -74,14 +74,14 @@ let compare bin print_metrics tool gt symsfile : unit = try
     let f_05 = 1.5 *. prec *. recl /. (0.5 *. prec +. recl) in
 
     (* print out the metrics *)
-    let headers, items = List.fold print_metrics ~init:([], []) ~f:(fun (headers, items) -> function
+    let headers, items = List.fold print_metrics ~init:(["Tool"], [tool_name]) ~f:(fun (headers, items) -> function
         | `with_prec -> "Precision"::headers, (Printf.sprintf "%.2g" prec)::items
         | `with_recl -> "Recall"::headers, (Printf.sprintf "%.2g" recl)::items
         | `with_F -> "F_05"::headers, (Printf.sprintf "%.2g" f_05)::items
         | `with_TP -> "TP"::headers, (Printf.sprintf "%d" tp)::items
         | `with_FN -> "FN"::headers, (Printf.sprintf "%d" fn)::items
         | `with_FP -> "FP"::headers, (Printf.sprintf "%d" fp)::items ) in
-    Printf.printf "Tool\t%s\nBW\t%s\t\n" (String.concat ~sep:"\t" headers)
+    Printf.printf "%s\n%s\n" (String.concat ~sep:"\t" headers)
       (String.concat ~sep:"\t" items)
   with
   | Func_start.Bad_user_input ->
