@@ -404,7 +404,7 @@ Executable "bap-compare"
   MainIs:         compare.ml
   Install:        true
   CompiledObject: best
-  BuildDepends:   bap, bap.plugins, cmdliner, fileutils, curl, re.posix
+  BuildDepends:   bap, bap.plugins, cmdliner, re.posix, fileutils
 
 Executable "bap-mc"
   Path:           src/bap_mc
