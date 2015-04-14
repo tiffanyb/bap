@@ -74,13 +74,15 @@ let compare bin print_metrics tool gt symsfile : unit = try
     let f_05 = 1.5 *. prec *. recl /. (0.5 *. prec +. recl) in
 
     (* print out the metrics *)
-    let headers, items = List.fold print_metrics ~init:(["Tool"], [tool_name]) ~f:(fun (headers, items) -> function
+    let headers, items =
+      let hd, it = List.fold print_metrics ~init:([], []) ~f:(fun (headers, items) -> function
         | `with_prec -> "Precision"::headers, (Printf.sprintf "%.2g" prec)::items
         | `with_recl -> "Recall"::headers, (Printf.sprintf "%.2g" recl)::items
         | `with_F -> "F_05"::headers, (Printf.sprintf "%.2g" f_05)::items
         | `with_TP -> "TP"::headers, (Printf.sprintf "%d" tp)::items
         | `with_FN -> "FN"::headers, (Printf.sprintf "%d" fn)::items
         | `with_FP -> "FP"::headers, (Printf.sprintf "%d" fp)::items ) in
+      "Tool" :: hd, tool_name :: it in
     Printf.printf "%s\n%s\n" (String.concat ~sep:"\t" headers)
       (String.concat ~sep:"\t" items)
   with
