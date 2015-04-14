@@ -16,7 +16,7 @@ let ignored = [
 module BW = Bap.Std.Byteweight.Bytes
 
 let train_on_file meth length db path : unit t =
-  Image.create path >>| fun (img,warns) ->
+  Image.create ~backend:"llvm" path >>| fun (img,warns) ->
   let arch = Image.arch img in
   let symtab = Addr.Table.create () in
   Table.iteri (Image.symbols img) ~f:(fun mem _ ->
@@ -65,7 +65,7 @@ let train meth length comp db paths =
   Ok ()
 
 let find threshold length comp path print_sexp (input : string) : unit t =
-  Image.create input >>= fun (img,_warns) ->
+  Image.create ~backend:"llvm" input >>= fun (img,_warns) ->
   let arch = Image.arch img in
   let data = Signatures.load ?path ~mode:"bytes" arch in
   Result.of_option data
@@ -95,7 +95,7 @@ let find threshold length comp path print_sexp (input : string) : unit t =
   Ok ()
 
 let symbols print_name print_size print_sexp input : unit t =
-  Image.create input >>| fun (img,_warns) ->
+  Image.create ~backend:"llvm" input >>| fun (img,_warns) ->
   let syms = Image.symbols img in
   if print_sexp then Symbols.write syms
   else (
