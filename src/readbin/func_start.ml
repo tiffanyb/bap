@@ -31,8 +31,8 @@ let ida bin : Addr.Hash_set.t =
   let roots_of_table t : addr list =
     Seq.(Table.regions t >>| Memory.min_addr |> to_list) in
   let res =
-    Printf.printf "%s\n%!" bin;
-    Image.create bin >>= fun (img, _warns) ->
+    Printf.printf "IDA: %s\n%!" bin;
+    Image.create ~backend:"llvm" bin >>= fun (img, _warns) ->
     let arch = Image.arch img in
     Ida.create ~ida:"idaq64" bin >>| fun ida ->
     Table.foldi (Image.sections img) ~init:[] ~f:(fun mem sec ida_syms ->
@@ -43,4 +43,4 @@ let ida bin : Addr.Hash_set.t =
         else ida_syms) in
   match res with
   | Ok l -> Printf.printf "IDA items: %d\n" @@ List.length l; Addr.Hash_set.of_list l
-  | Error err -> Addr.Hash_set.of_list []
+  | Error err -> Printf.printf "IDA Error: %s\n" @@ Error.to_string_hum err; Addr.Hash_set.of_list []
