@@ -81,10 +81,7 @@ let write_addrset ?filename (addr_set : Addr.Hash_set.t) : unit =
   Out_channel.close oc
 
 let write ?filename (syms : symbol table) : unit =
-  (* TODO: To convert from symbol table to address set, I convert symbol table
-   * to address list first, then convert address list to address set. I am not
-   * sure if this is the right way of conversion. *)
   let fs_l = Table.foldi syms ~init:[] ~f:(fun mem _sym fs_list ->
-    let addr = Memory.min_addr mem in
-    addr::fs_list) in
+      let addr = Memory.min_addr mem in
+      addr::fs_list) in
   write_addrset ?filename @@ Addr.Hash_set.of_list fs_l
