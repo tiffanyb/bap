@@ -11,9 +11,6 @@ let byteweight bin =
   Symbols.read_addrset tmp
 
 let usersource = Symbols.read_addrset
-(* let s = Addr.Hash_set.of_list [Addr.of_string "0x1234:32"] in
-   Symbols.write_addrset ~filename:f s;
-   Symbols.read_addrset f *)
 
 let symbols bin =
   let tmp = Filename.temp_file "bw_" ".output" in
