@@ -7,7 +7,7 @@ exception Not_found
 
 let print_source = function
   | `bw -> print_endline "bw"
-  | _ -> print_endline "else"
+  | _ -> print_endline "others"
 
 let source = [
   "BW", `bw;
@@ -26,7 +26,7 @@ let gt : _ Term.t =
   Arg.(value & pos 2 (enum source) `symtbl & info [] ~docv:"gt" ~doc)
 
 let symsfile : string option Term.t =
-  let doc = "The symbol table of binaries. This requires the binaries Use this file as symbols source." in
+  let doc = "The symbol table of binaries. This requires the binaries to use this file as symbols source." in
   Arg.(value & opt (some non_dir_file) None & info ["syms"; "s"]
          ~docv:"syms" ~doc)
 
@@ -75,13 +75,14 @@ let compare bin print_metrics tool gt symsfile : unit = try
 
     (* print out the metrics *)
     let headers, items =
-      let rev_hd, rev_it = List.fold print_metrics ~init:(["Tool"], [tool_name]) ~f:(fun (headers, items) -> function
-        | `with_prec -> "Prcs"::headers, (Printf.sprintf "%.2g" prec)::items
-        | `with_recl -> "Rcll"::headers, (Printf.sprintf "%.2g" recl)::items
-        | `with_F -> "F_05"::headers, (Printf.sprintf "%.2g" f_05)::items
-        | `with_TP -> "TP"::headers, (Printf.sprintf "%d" tp)::items
-        | `with_FN -> "FN"::headers, (Printf.sprintf "%d" fn)::items
-        | `with_FP -> "FP"::headers, (Printf.sprintf "%d" fp)::items ) in
+      let rev_hd, rev_it = List.fold print_metrics ~init:(["Tool"], [tool_name])
+          ~f:(fun (headers, items) -> function
+              | `with_prec -> "Prcs"::headers, (Printf.sprintf "%.2g" prec)::items
+              | `with_recl -> "Rcll"::headers, (Printf.sprintf "%.2g" recl)::items
+              | `with_F -> "F_05"::headers, (Printf.sprintf "%.2g" f_05)::items
+              | `with_TP -> "TP"::headers, (Printf.sprintf "%d" tp)::items
+              | `with_FN -> "FN"::headers, (Printf.sprintf "%d" fn)::items
+              | `with_FP -> "FP"::headers, (Printf.sprintf "%d" fp)::items ) in
       List.rev rev_hd, List.rev rev_it in
     Printf.printf "%s\n%s\n" (String.concat ~sep:"\t" headers)
       (String.concat ~sep:"\t" items)
@@ -95,7 +96,7 @@ let compare_t = Term.(pure compare $bin $print_metrics $tool $gt $symsfile)
 let info =
   let doc = "Bap-compare: to compare with the result against IDA Pro and the
   ground truth" in
-  let man = [ `S "BUGS"; `P "Email bug reports"; ] in
+  let man = [] in
   Term.info "bap-compare" ~version:"1.6.1" ~doc ~man
 
 let () =
