@@ -21,12 +21,18 @@ let symbols bin =
   with _ -> raise Bad_user_input
 
 let ida bin : Addr.Hash_set.t =
+  (* Strip the binary if it is not stripped yet *)
   let roots_of_table t : addr list =
     Seq.(Table.regions t >>| Memory.min_addr |> to_list) in
   let res =
-    Image.create ~backend:"llvm" bin >>= fun (img, _warns) ->
+    let stripped_bin =
+      let basename = Filename.basename bin in
+      Filename.temp_file basename ".stripped" in
+    let cmd = Printf.sprintf "x86_64-elf-strip %s -o %s" bin stripped_bin in
+    let _ = Unix.system cmd in
+    Image.create ~backend:"llvm" stripped_bin >>= fun (img, _warns) ->
     let arch = Image.arch img in
-    Ida.create ~ida:"idaq64" bin >>| fun ida ->
+    Ida.create ~ida:"idaq64" stripped_bin >>| fun ida ->
     Table.foldi (Image.sections img) ~init:[] ~f:(fun mem sec ida_syms ->
         if Section.is_executable sec then
           let ida_syms_t = roots_of_table Ida.(get_symbols ida arch mem) in
