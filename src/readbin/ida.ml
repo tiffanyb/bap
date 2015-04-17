@@ -20,7 +20,7 @@ let system cmd =
   let return = Sys.command cmd in
   if return = 0 then ()
   else raise (Cmderr cmd)
-      
+
 let pread cmd = Printf.ksprintf run cmd
 let shell cmd = Printf.ksprintf (fun cmd () -> system cmd) cmd
 
@@ -146,8 +146,7 @@ let run_script self script_to =
 
 let get_symbols ?demangle t arch mem =
   let result = run_script t Idapy.extract_symbols in
-  In_channel.with_file result ~f:(fun ic ->
-    Symbols.read ?demangle ic arch mem)
+  Symbols.read ?demangle ~filename:result arch mem
 
 let close self = self.close ()
 
