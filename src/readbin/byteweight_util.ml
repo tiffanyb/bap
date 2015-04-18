@@ -13,7 +13,7 @@ let ignored = [
   ];
 ]
 
-module BW = Bap.Std.Byteweight.Bytes
+module BW = Bap_byteweight.Bytes
 
 let train_on_file meth length db path : unit t =
   Image.create ~backend:"llvm" path >>| fun (img,warns) ->
@@ -28,7 +28,7 @@ let train_on_file meth length db path : unit t =
         Binable.of_string (module BW) s
       | _ -> BW.create () in
   Table.iteri (Image.sections img) ~f:(fun mem sec ->
-      if Image.Sec.is_executable sec then
+      if Section.is_executable sec then
         BW.train bw ~max_length:length test mem);
   let data = Binable.to_string (module BW) bw in
   Signatures.save ~mode:"bytes" ~path:db arch data
@@ -71,7 +71,7 @@ let find threshold length comp path print_sexp (input : string) : unit t =
   Result.of_option data
     ~error:(Error.of_string "failed to read signatures from database")
   >>= fun data ->
-  let bw = Binable.of_string (module Byteweight) data in
+  let bw = Binable.of_string (module BW) data in
   (* if output sexp, get the addr set and output *)
   if print_sexp then
     let fs_set =
@@ -88,7 +88,7 @@ let find threshold length comp path print_sexp (input : string) : unit t =
     if Section.is_executable sec then
       let start = Memory.min_addr mem in
       let rec loop n =
-        match Byteweight.next bw ~length ~threshold mem n with
+        match BW.next bw ~length ~threshold mem n with
         | Some n -> printf "%a\n" Addr.ppo Addr.(start ++ n); loop (n+1)
         | None -> () in
       loop 0);
