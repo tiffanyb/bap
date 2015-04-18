@@ -50,7 +50,7 @@ let demangle_name ?(how=`internal) name =
     | `internal -> demangle_native name
   else name
 
-let read ?demangle ~filename arch base  : string table =
+let read ?demangle ~filename arch base : string table =
   let demangle name = match demangle with
     | None -> name
     | Some how -> demangle_name ~how name in
@@ -69,19 +69,17 @@ let read ?demangle ~filename arch base  : string table =
           with _exn -> syms))
 
 let read_addrset filename : Addr.Set.t =
-  let ic = In_channel.create filename in
-  let set_string = In_channel.input_all ic in
-  Addr.Set.t_of_sexp @@ Sexp.of_string set_string
+  Addr.Set.t_of_sexp @@ Sexp.load_sexp filename
 
 let write_addrset ?filename (addr_set : Addr.Set.t) : unit =
   let oc = match filename with
     | None -> Out_channel.stdout
     | Some f -> Out_channel.create f in
-  Out_channel.output_string oc @@ Sexp.to_string (Addr.Set.sexp_of_t addr_set);
+  Sexp.output oc (Addr.Set.sexp_of_t addr_set);
   Out_channel.close oc
 
 let write ?filename (syms : symbol table) : unit =
-  let fs_l = Table.foldi syms ~init:[] ~f:(fun mem _sym fs_list ->
+  let fs_s = Table.foldi syms ~init:Addr.Set.empty ~f:(fun mem _sym fs_set ->
       let addr = Memory.min_addr mem in
-      addr::fs_list) in
-  write_addrset ?filename @@ Addr.Set.of_list fs_l
+      Addr.Set.add fs_set addr) in
+  write_addrset ?filename fs_s
