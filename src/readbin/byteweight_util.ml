@@ -13,7 +13,7 @@ let ignored = [
   ];
 ]
 
-module BW = Bap_byteweight.Bytes
+module Byteweight = Bap_byteweight.Bytes
 
 let train_on_file meth length db path : unit t =
   Image.create path >>| fun (img,warns) ->
@@ -22,15 +22,15 @@ let train_on_file meth length db path : unit t =
   Table.iteri (Image.symbols img) ~f:(fun mem _ ->
       Addr.Table.add_exn symtab ~key:(Memory.min_addr mem) ~data:());
   let test mem = Addr.Table.mem symtab (Memory.min_addr mem) in
-  let bw = if not (Sys.file_exists db) then BW.create ()
+  let bw = if not (Sys.file_exists db) then Byteweight.create ()
     else match Signatures.load ~mode:"bytes" ~path:db arch with
       | Some s when meth = `update ->
-        Binable.of_string (module BW) s
-      | _ -> BW.create () in
+        Binable.of_string (module Byteweight) s
+      | _ -> Byteweight.create () in
   Table.iteri (Image.sections img) ~f:(fun mem sec ->
       if Section.is_executable sec then
-        BW.train bw ~max_length:length test mem);
-  let data = Binable.to_string (module BW) bw in
+        Byteweight.train bw ~max_length:length test mem);
+  let data = Binable.to_string (module Byteweight) bw in
   Signatures.save ~mode:"bytes" ~path:db arch data
 
 let matching =
@@ -64,22 +64,19 @@ let train meth length comp db paths =
   printf "Signatures are stored in %s\n%!" db;
   Ok ()
 
-let create_bw img path : BW.t t =
+let find threshold length comp path (input : string) : unit t =
+  Image.create input >>= fun (img,_warns) ->
   let arch = Image.arch img in
   let data = Signatures.load ?path ~mode:"bytes" arch in
   Result.of_option data
     ~error:(Error.of_string "failed to read signatures from database")
-  >>| fun data ->
-  Binable.of_string (module BW) data
-
-let find threshold length path (input : string) : unit t =
-  Image.create input >>= fun (img, _warns) ->
-  create_bw img path >>= fun bw ->
+  >>= fun data ->
+  let bw = Binable.of_string (module Byteweight) data in
   Table.iteri (Image.sections img) ~f:(fun mem sec ->
       if Section.is_executable sec then
         let start = Memory.min_addr mem in
         let rec loop n =
-          match BW.next bw ~length ~threshold mem n with
+          match Byteweight.next bw ~length ~threshold mem n with
           | Some n -> printf "%a\n" Addr.ppo Addr.(start ++ n); loop (n+1)
           | None -> () in
         loop 0);
@@ -96,23 +93,37 @@ let symbols print_name print_size input : unit t =
       printf "%a %s%s\n" Addr.ppo addr size name);
   printf "Outputted %d symbols\n" (Table.length syms)
 
-let dump _output_format info length threshold path (input : string) : unit t =
+let metrics threshold length path (input : string) : unit t =
+  let roots_of_table t : addr list =
+    Seq.(Table.regions t >>| Memory.min_addr |> to_list) in
   Image.create input >>= fun (img, _warns) ->
-  match info with
-  | `BW ->
-    create_bw img path >>= fun bw ->
-    let fs_set = Table.foldi (Image.sections img) ~init:Addr.Set.empty
-        ~f:(fun mem sec fs_s ->
-            if Section.is_executable sec then
-              let new_fs_s = BW.find bw ~length ~threshold mem in
-              Addr.Set.union fs_s @@ Addr.Set.of_list new_fs_s
-            else fs_s) in
-    Symbols.write_addrset fs_set;
-    Ok ()
-  | `SymTbl ->
-    let syms = Image.symbols img in
-    Symbols.write syms;
-    Ok ()
+  let gt_syms : addr list =
+    let gt_table = Image.symbols img in
+    roots_of_table gt_table in
+  let arch = Image.arch img in
+  let data = Signatures.load ?path ~mode:"bytes" arch in
+  Result.of_option data
+    ~error:(Error.of_string "failed to read signatures from database")
+    >>= fun data ->
+     (*  List.iter [] ~f:(fun addr -> printf "%a\n" Addr.ppo addr) *)
+  let bw = Binable.of_string (module Byteweight) data in
+  Ida.create ~ida:"idaq64" input >>| fun ida ->
+    let ida_syms, bw_syms =
+      Table.foldi (Image.sections img) ~init:([], []) ~f:(fun mem sec (ida_syms,
+      bw_syms) ->
+        if Section.is_executable sec then
+          let ida_syms_t = roots_of_table Ida.(get_symbols ida arch mem) in
+          let bw_syms_t =
+            let module BW = Bap_byteweight.Bytes in
+            BW.find bw ~length ~threshold mem in
+          ida_syms @ ida_syms_t, bw_syms @ bw_syms_t
+        else ida_syms, bw_syms) in
+    (* List.iter bw_syms ~f:(fun addr -> printf "%a\n" Addr.ppo addr);
+    List.iter ida_syms ~f:(fun addr -> printf "%a\n" Addr.ppo addr);
+    List.iter gt_syms ~f:(printf "%a\n" Addr.ppo); *)
+    let bw_measurement = Measure.compare bw_syms gt_syms "bw" in
+    let ida_measurement = Measure.compare ida_syms gt_syms "ida" in
+    Measure.pp [bw_measurement;ida_measurement]
 
 let create_parent_dir dst =
   let dir = if Filename.(check_suffix dst dir_sep)
@@ -126,7 +137,6 @@ let fetch fname url =
   Curl.set_writefunction conn (write);
   Curl.set_failonerror conn true;
   Curl.set_followlocation conn true;
-  Curl.set_sslverifypeer conn false;
   Curl.set_url conn url;
   Curl.perform conn;
   Curl.cleanup conn;
@@ -213,7 +223,6 @@ module Cmdline = struct
   let src : string Term.t =
     Arg.(value & pos 0 non_dir_file "sigs.zip" & info []
            ~doc:"Signatures file" ~docv:"SRC")
-
   let dst : string Term.t =
     Arg.(value & pos 1 string Signatures.default_path &
          info [] ~doc:"Destination" ~docv:"DST")
@@ -230,22 +239,6 @@ module Cmdline = struct
     let doc = "Print symbol's size." in
     Arg.(value & flag & info ["print-size"; "s"] ~doc)
 
-  let output_format : [`text | `sexp] Term.t =
-    let enums = ["text", `text; "sexp", `sexp] in
-    let doc = sprintf "The output format. %s" @@ Arg.doc_alts_enum enums in
-    Arg.(value & opt (enum enums) `sexp & info ["output_format"; "f"] ~doc)
-
-  let tool : [`BW | `SymTbl] Term.t =
-    let enums = ["BW", `BW; "SymTbl", `SymTbl] in
-    let doc = sprintf "The info to be dumped. %s" @@ Arg.doc_alts_enum enums in
-    Arg.(value & opt (enum enums) `BW & info ["info"; "i"] ~doc)
-
-  let dump =
-    let doc = "Dump the function starts in a given executable by given tool" in
-    Term.(pure dump $output_format $tool $length $threshold $database_in
-          $filename),
-    Term.info "dump" ~doc
-
   let train =
     let doc = "Train byteweight on the specified set of files" in
     Term.(pure train $meth $length $compiler $database $files),
@@ -253,7 +246,7 @@ module Cmdline = struct
 
   let find =
     let doc = "Output all function starts in a given executable" in
-    Term.(pure find $threshold $length $database_in $filename),
+    Term.(pure find $threshold $length $compiler $database_in $filename),
     Term.info "find" ~doc
 
   let fetch =
@@ -292,7 +285,7 @@ module Cmdline = struct
       ~version:Config.pkg_version ~doc ~man
 
   let eval () = Term.eval_choice default
-      [train; find; fetch; install; update; symbols; dump]
+      [train; find; fetch; install; update; symbols]
 end
 
 let () =
