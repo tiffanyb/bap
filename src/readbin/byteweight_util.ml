@@ -75,23 +75,24 @@ let find threshold length comp path print_sexp (input : string) : unit t =
   (* if output sexp, get the addr set and output *)
   if print_sexp then
     let fs_set =
-      let fs_list = Table.foldi (Image.sections img) ~init:[] ~f:(fun mem sec fs_l ->
-        if Section.is_executable sec then
-          let new_fs_l = let module BW = Bap_byteweight.Bytes in
-            BW.find bw ~length ~threshold mem in
-          fs_l @ new_fs_l
-        else fs_l) in
+      let fs_list = Table.foldi (Image.sections img) ~init:[]
+          ~f:(fun mem sec fs_l ->
+              if Section.is_executable sec then
+                let new_fs_l = let module BW = Bap_byteweight.Bytes in
+                  BW.find bw ~length ~threshold mem in
+                fs_l @ new_fs_l
+              else fs_l) in
       Addr.Hash_set.of_list fs_list in
     Symbols.write_addrset fs_set
   else
-  Table.iteri (Image.sections img) ~f:(fun mem sec ->
-    if Section.is_executable sec then
-      let start = Memory.min_addr mem in
-      let rec loop n =
-        match BW.next bw ~length ~threshold mem n with
-        | Some n -> printf "%a\n" Addr.ppo Addr.(start ++ n); loop (n+1)
-        | None -> () in
-      loop 0);
+    Table.iteri (Image.sections img) ~f:(fun mem sec ->
+        if Section.is_executable sec then
+          let start = Memory.min_addr mem in
+          let rec loop n =
+            match BW.next bw ~length ~threshold mem n with
+            | Some n -> printf "%a\n" Addr.ppo Addr.(start ++ n); loop (n+1)
+            | None -> () in
+          loop 0);
   Ok ()
 
 let symbols print_name print_size print_sexp input : unit t =
