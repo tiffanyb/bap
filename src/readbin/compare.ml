@@ -57,7 +57,7 @@ let func_start bin symsfile unstrip_bin : _ -> Addr.Set.t * string = function
   | `bw -> Func_start.byteweight bin, "BW"
   | `user -> (match symsfile with
       | None -> raise Not_found
-      | Some f -> Func_start.usersource f, "User")
+      | Some f -> Func_start.user f, "User")
   | `symtbl -> (match unstrip_bin with
       | None -> raise No_unstripped_file
       | Some b -> Func_start.symbols b, "Symbol")
@@ -95,11 +95,12 @@ let compare bin print_metrics tool gt symsfile unstrip_bin : unit = try
     Printf.printf "%s\n%s\n" (String.concat ~sep:"\t" headers)
       (String.concat ~sep:"\t" items)
   with
-  | Func_start.Bad_user_input ->
-    Printf.printf "Symbol file is in wrong format.\n"
+  | Func_start.Bad_user_input subcmd ->
+    Printf.printf "bap-byteweight %s command does not work properly.\n" subcmd
   | Not_found -> Printf.printf "No Symbol File found.\n"
   | No_unstripped_file ->
-    Printf.printf "Cannot get symbole table: No unstripped file found.\n"
+    Printf.printf "Cannot get symbole table: No unstripped file found. Did you
+    provide unstripped binary by -u?\n"
 
 let compare_t = Term.(pure compare $bin $print_metrics $tool $gt $symsfile
                       $unstrip_bin)
