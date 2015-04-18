@@ -22,7 +22,7 @@ let ida bin : Addr.Set.t =
   let sets_of_table t : Addr.Set.t =
     Addr.Set.of_list Seq.(Table.regions t >>| Memory.min_addr |> to_list) in
   let res =
-    Image.create ~backend:"llvm" bin >>= fun (img, _warns) ->
+    Image.create bin >>= fun (img, _warns) ->
     let arch = Image.arch img in
     Ida.create ~ida:"idaq64" bin >>| fun ida ->
     Table.foldi (Image.sections img) ~init:Addr.Set.empty ~f:(fun mem sec ida_syms ->
