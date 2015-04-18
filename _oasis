@@ -393,8 +393,8 @@ Executable "bap"
                   re.posix
 
 Executable "bap-byteweight"
-  Path:           src/byteweight
-  MainIs:         byteweight.ml
+  Path:           src/readbin
+  MainIs:         byteweight_util.ml
   Install:        true
   CompiledObject: best
   BuildDepends:   bap, bap.plugins, cmdliner, fileutils, curl, re.posix
