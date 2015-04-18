@@ -30,6 +30,11 @@ let symsfile : string option Term.t =
   Arg.(value & opt (some non_dir_file) None & info ["syms"; "s"]
          ~docv:"syms" ~doc)
 
+let unstrip_bin : string option Term.t =
+  let doc = "The unstripped binary" in
+  Arg.(value & opt (some non_dir_file) None & info ["unstrip"; "u"]
+         ~docv:"unstripped_bin" ~doc)
+
 let print_metrics : _ list Term.t =
   let opts = [
     "precision", `with_prec;
@@ -39,7 +44,8 @@ let print_metrics : _ list Term.t =
     "FP", `with_FP;
     "FN", `with_FN;
   ] in
-  let doc = "doc" in
+  let doc = "Print metrics. User can choose to print -cprecision, -crecall,
+  -cF_measure, -cTP, -cFP and -cFN." in
   Arg.(value & opt_all (enum opts) (List.map ~f:snd opts) &
        info ["with-metrics"; "c"] ~doc)
 
@@ -47,18 +53,20 @@ let bin : string Term.t =
   let doc = "binary" in
   Arg.(required & pos 0 (some non_dir_file) None & info [] ~docv:"binary" ~doc)
 
-let func_start bin symsfile : _ -> Addr.Hash_set.t * string = function
+let func_start bin symsfile unstrip_bin : _ -> Addr.Hash_set.t * string = function
   | `bw -> Func_start.byteweight bin, "BW"
   | `user -> (match symsfile with
       | None -> raise Not_found
       | Some f -> Func_start.usersource f, "User")
-  | `symtbl -> Func_start.symbols bin, "Symbol"
+  | `symtbl -> (match unstrip_bin with
+      | None -> raise Not_found
+      | Some b -> Func_start.symbols b, "Symbol")
   | `ida -> Func_start.ida bin, "IDA"
   | _ -> Addr.Hash_set.create (), "None"
 
-let compare bin print_metrics tool gt symsfile : unit = try
-    let fs_tool, tool_name = func_start bin symsfile tool in
-    let fs_gt, _ = func_start bin symsfile gt in
+let compare bin print_metrics tool gt symsfile unstrip_bin : unit = try
+    let fs_tool, tool_name = func_start bin symsfile unstrip_bin tool in
+    let fs_gt, _ = func_start bin symsfile unstrip_bin gt in
     let fp =
       let set = Hash_set.diff fs_tool fs_gt in
       Hash_set.length set in
@@ -91,7 +99,8 @@ let compare bin print_metrics tool gt symsfile : unit = try
     Printf.printf "Symbol file is in wrong format.\n"
   | Not_found -> Printf.printf "No Symbol File found.\n"
 
-let compare_t = Term.(pure compare $bin $print_metrics $tool $gt $symsfile)
+let compare_t = Term.(pure compare $bin $print_metrics $tool $gt $symsfile
+                      $unstrip_bin)
 
 let info =
   let doc = "Bap-compare: to compare with the result against IDA Pro and the
