@@ -3,7 +3,7 @@ open Cmdliner
 open Bap.Std
 open Bap_plugins.Std
 
-exception Not_found
+exception No_unstripped_file
 
 let print_source = function
   | `bw -> print_endline "bw"
@@ -17,12 +17,12 @@ let source = [
 ]
 
 let tool : _ Term.t =
-  let doc = "The tool that we are going to evaluate" in
+  let doc = "The tool that we are going to evaluate. It can be BW or Ida." in
   Arg.(value & pos 1 (enum source) `bw & info [] ~docv:"tool" ~doc)
 
 let gt : _ Term.t =
-  let doc = "The ground truth source. One can direct to a user file, the symbol
-  table" in
+  let doc = "The ground truth source. One can direct to a user file or use the symbol
+  table from unstripped binary (-u required)." in
   Arg.(value & pos 2 (enum source) `symtbl & info [] ~docv:"gt" ~doc)
 
 let symsfile : string option Term.t =
@@ -31,7 +31,7 @@ let symsfile : string option Term.t =
          ~docv:"syms" ~doc)
 
 let unstrip_bin : string option Term.t =
-  let doc = "The unstripped binary" in
+  let doc = "The unstripped binary." in
   Arg.(value & opt (some non_dir_file) None & info ["unstrip"; "u"]
          ~docv:"unstripped_bin" ~doc)
 
@@ -50,30 +50,30 @@ let print_metrics : _ list Term.t =
        info ["with-metrics"; "c"] ~doc)
 
 let bin : string Term.t =
-  let doc = "binary" in
+  let doc = "The testing stripped binary." in
   Arg.(required & pos 0 (some non_dir_file) None & info [] ~docv:"binary" ~doc)
 
-let func_start bin symsfile unstrip_bin : _ -> Addr.Hash_set.t * string = function
+let func_start bin symsfile unstrip_bin : _ -> Addr.Set.t * string = function
   | `bw -> Func_start.byteweight bin, "BW"
   | `user -> (match symsfile with
       | None -> raise Not_found
       | Some f -> Func_start.usersource f, "User")
   | `symtbl -> (match unstrip_bin with
-      | None -> raise Not_found
+      | None -> raise No_unstripped_file
       | Some b -> Func_start.symbols b, "Symbol")
   | `ida -> Func_start.ida bin, "IDA"
-  | _ -> Addr.Hash_set.create (), "None"
+  | _ -> Addr.Set.empty, "None"
 
 let compare bin print_metrics tool gt symsfile unstrip_bin : unit = try
     let fs_tool, tool_name = func_start bin symsfile unstrip_bin tool in
     let fs_gt, _ = func_start bin symsfile unstrip_bin gt in
     let fp =
-      let set = Hash_set.diff fs_tool fs_gt in
-      Hash_set.length set in
+      let set = Set.diff fs_tool fs_gt in
+      Set.length set in
     let fn =
-      let set = Hash_set.diff fs_gt fs_tool in
-      Hash_set.length set in
-    let tp = Hash_set.length fs_gt - fn in
+      let set = Set.diff fs_gt fs_tool in
+      Set.length set in
+    let tp = Set.length fs_gt - fn in
     let prec, recl =
       let f_fp = float fp in
       let f_fn = float fn in
@@ -98,13 +98,15 @@ let compare bin print_metrics tool gt symsfile unstrip_bin : unit = try
   | Func_start.Bad_user_input ->
     Printf.printf "Symbol file is in wrong format.\n"
   | Not_found -> Printf.printf "No Symbol File found.\n"
+  | No_unstripped_file ->
+    Printf.printf "Cannot get symbole table: No unstripped file found.\n"
 
 let compare_t = Term.(pure compare $bin $print_metrics $tool $gt $symsfile
                       $unstrip_bin)
 
 let info =
-  let doc = "Bap-compare: to compare with the result against IDA Pro and the
-  ground truth" in
+  let doc = "to compare the functions start identification result to the ground
+  truth" in
   let man = [] in
   Term.info "bap-compare" ~version:"1.6.1" ~doc ~man
 

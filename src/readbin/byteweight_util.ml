@@ -82,7 +82,7 @@ let find threshold length comp path print_sexp (input : string) : unit t =
                   BW.find bw ~length ~threshold mem in
                 fs_l @ new_fs_l
               else fs_l) in
-      Addr.Hash_set.of_list fs_list in
+      Addr.Set.of_list fs_list in
     Symbols.write_addrset fs_set
   else
     Table.iteri (Image.sections img) ~f:(fun mem sec ->

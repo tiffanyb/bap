@@ -20,7 +20,7 @@ let symbols bin =
     Symbols.read_addrset tmp
   with _ -> raise Bad_user_input
 
-let ida bin : Addr.Hash_set.t =
+let ida bin : Addr.Set.t =
   let roots_of_table t : addr list =
     Seq.(Table.regions t >>| Memory.min_addr |> to_list) in
   let res =
@@ -33,5 +33,5 @@ let ida bin : Addr.Hash_set.t =
           ida_syms @ ida_syms_t
         else ida_syms) in
   match res with
-  | Ok l -> Addr.Hash_set.of_list l
-  | Error err -> Printf.printf "IDA Error: %s\n" @@ Error.to_string_hum err; Addr.Hash_set.of_list []
+  | Ok l -> Addr.Set.of_list l
+  | Error err -> Printf.printf "IDA Error: %s\n" @@ Error.to_string_hum err; Addr.Set.of_list []
