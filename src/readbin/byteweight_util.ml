@@ -64,6 +64,15 @@ let train meth length comp db paths =
   printf "Signatures are stored in %s\n%!" db;
   Ok ()
 
+let output_sexp img bw length threshold =
+  let fs_set = Table.foldi (Image.sections img) ~init:Addr.Set.empty
+      ~f:(fun mem sec fs_s ->
+          if Section.is_executable sec then
+            let new_fs_s = BW.find bw ~length ~threshold mem in
+            Addr.Set.union fs_s @@ Addr.Set.of_list new_fs_s
+          else fs_s) in
+  Symbols.write_addrset fs_set
+
 let find threshold length comp path print_sexp (input : string) : unit t =
   Image.create input >>= fun (img,_warns) ->
   let arch = Image.arch img in
@@ -73,17 +82,7 @@ let find threshold length comp path print_sexp (input : string) : unit t =
   >>= fun data ->
   let bw = Binable.of_string (module BW) data in
   (* if output sexp, get the addr set and output *)
-  if print_sexp then
-    let fs_set =
-      let fs_list = Table.foldi (Image.sections img) ~init:[]
-          ~f:(fun mem sec fs_l ->
-              if Section.is_executable sec then
-                let new_fs_l = let module BW = Bap_byteweight.Bytes in
-                  BW.find bw ~length ~threshold mem in
-                fs_l @ new_fs_l
-              else fs_l) in
-      Addr.Set.of_list fs_list in
-    Symbols.write_addrset fs_set
+  if print_sexp then output_sexp img bw length threshold
   else
     Table.iteri (Image.sections img) ~f:(fun mem sec ->
         if Section.is_executable sec then
