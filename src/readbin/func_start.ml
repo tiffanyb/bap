@@ -19,16 +19,16 @@ let symbols bin = bap_byteweight bin "symbols"
 let user = Symbols.read_addrset
 
 let ida bin : Addr.Set.t =
-  let sets_of_table t : Addr.Set.t =
-    Addr.Set.of_list Seq.(Table.regions t >>| Memory.min_addr |> to_list) in
   let res =
     Image.create bin >>= fun (img, _warns) ->
     let arch = Image.arch img in
     Ida.create ~ida:"idaq64" bin >>| fun ida ->
     Table.foldi (Image.sections img) ~init:Addr.Set.empty ~f:(fun mem sec ida_syms ->
         if Section.is_executable sec then
-          let ida_syms_t = sets_of_table Ida.(get_symbols ida arch mem) in
-          Addr.Set.union ida_syms ida_syms_t
+          let sym_tbl = Ida.(get_symbols ida arch mem) in
+          Seq.fold Seq.(Table.regions sym_tbl >>| Memory.min_addr)
+            ~init:ida_syms
+            ~f:(fun s sym -> Addr.Set.add s sym)
         else ida_syms) in
   match res with
   | Ok l -> l
