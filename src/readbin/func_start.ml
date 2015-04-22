@@ -18,11 +18,11 @@ let symbols bin = bap_byteweight bin "symbols"
 
 let user = Symbols.read_addrset
 
-let ida bin : Addr.Set.t =
+let ida ?use_ida bin : Addr.Set.t =
   let res =
     Image.create bin >>= fun (img, _warns) ->
     let arch = Image.arch img in
-    Ida.create ~ida:"idaq64" bin >>| fun ida ->
+    Ida.create ?ida:use_ida bin >>| fun ida ->
     Table.foldi (Image.sections img) ~init:Addr.Set.empty ~f:(fun mem sec ida_syms ->
         if Section.is_executable sec then
           let sym_tbl = Ida.(get_symbols ida arch mem) in

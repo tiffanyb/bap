@@ -16,14 +16,20 @@ let source = [
   "Ida", `ida;
 ]
 
+let source_gt = [
+  "User", `user;
+  "SymTbl", `symtbl
+]
+
 let tool : _ Term.t =
-  let doc = "The tool that we are going to evaluate. It can be BW or Ida." in
+  let doc = "The source of the function start result that we are going to
+  evaluate. " ^ (Arg.doc_alts_enum source) in
   Arg.(value & pos 1 (enum source) `bw & info [] ~docv:"tool" ~doc)
 
 let gt : _ Term.t =
   let doc = "The ground truth source. One can direct to a user file or use the symbol
-  table from unstripped binary (-u required)." in
-  Arg.(value & pos 2 (enum source) `symtbl & info [] ~docv:"gt" ~doc)
+  table from unstripped binary (-u required). " ^ (Arg.doc_alts_enum source_gt) in
+  Arg.(value & pos 2 (enum source_gt) `symtbl & info [] ~docv:"gt" ~doc)
 
 let symsfile : string option Term.t =
   let doc = "The symbol table of binaries. This requires the binaries to use this file as symbols source." in
@@ -34,6 +40,13 @@ let unstrip_bin : string option Term.t =
   let doc = "The unstripped binary." in
   Arg.(value & opt (some non_dir_file) None & info ["unstrip"; "u"]
          ~docv:"unstripped_bin" ~doc)
+
+let use_ida : string option Term.t =
+  let doc = "Use Ida to extract symbols from file. \
+             You can optionally provide path to IDA executable, \
+             or executable name." in
+  Arg.(value & opt (some string) None & info
+         ["use-ida"] ~doc)
 
 let print_metrics : _ list Term.t =
   let opts = [
@@ -53,7 +66,7 @@ let bin : string Term.t =
   let doc = "The testing stripped binary." in
   Arg.(required & pos 0 (some non_dir_file) None & info [] ~docv:"binary" ~doc)
 
-let func_start bin symsfile unstrip_bin : _ -> Addr.Set.t * string = function
+let func_start bin symsfile unstrip_bin use_ida : _ -> Addr.Set.t * string = function
   | `bw -> Func_start.byteweight bin, "BW"
   | `user -> (match symsfile with
       | None -> raise Not_found
@@ -61,12 +74,11 @@ let func_start bin symsfile unstrip_bin : _ -> Addr.Set.t * string = function
   | `symtbl -> (match unstrip_bin with
       | None -> raise No_unstripped_file
       | Some b -> Func_start.symbols b, "Symbol")
-  | `ida -> Func_start.ida bin, "IDA"
-  | _ -> Addr.Set.empty, "None"
+  | `ida -> Func_start.ida ?use_ida bin, "IDA"
 
-let compare bin print_metrics tool gt symsfile unstrip_bin : unit = try
-    let fs_tool, tool_name = func_start bin symsfile unstrip_bin tool in
-    let fs_gt, _ = func_start bin symsfile unstrip_bin gt in
+let compare bin print_metrics tool gt symsfile unstrip_bin use_ida : unit = try
+    let fs_tool, tool_name = func_start bin symsfile unstrip_bin use_ida tool in
+    let fs_gt, _ = func_start bin symsfile unstrip_bin use_ida gt in
     let fp =
       let set = Set.diff fs_tool fs_gt in
       Set.length set in
@@ -103,7 +115,7 @@ let compare bin print_metrics tool gt symsfile unstrip_bin : unit = try
     provide unstripped binary by -u?\n"
 
 let compare_t = Term.(pure compare $bin $print_metrics $tool $gt $symsfile
-                      $unstrip_bin)
+                      $unstrip_bin $use_ida)
 
 let info =
   let doc = "to compare the functions start identification result to the ground
