@@ -66,7 +66,8 @@ let bin : string Term.t =
   let doc = "The testing stripped binary." in
   Arg.(required & pos 0 (some non_dir_file) None & info [] ~docv:"binary" ~doc)
 
-let func_start bin symsfile unstrip_bin use_ida : _ -> Addr.Set.t * string = function
+let func_start bin symsfile unstrip_bin use_ida : _ -> Addr.Set.t * string =
+  function
   | `bw -> Func_start.byteweight bin, "BW"
   | `user -> (match symsfile with
       | None -> raise Not_found
@@ -107,8 +108,9 @@ let compare bin print_metrics tool gt symsfile unstrip_bin use_ida : unit = try
     Printf.printf "%s\n%s\n" (String.concat ~sep:"\t" headers)
       (String.concat ~sep:"\t" items)
   with
-  | Func_start.Bad_user_input subcmd ->
-    Printf.printf "bap-byteweight %s command does not work properly.\n" subcmd
+  | Func_start.Bad_user_input tool ->
+    Printf.printf "bap-byteweight dump %s command does not \
+                   work properly.\n" tool
   | Not_found -> Printf.printf "No Symbol File found.\n"
   | No_unstripped_file ->
     Printf.printf "Cannot get symbole table: No unstripped file found. Did you
@@ -121,7 +123,7 @@ let info =
   let doc = "to compare the functions start identification result to the ground
   truth" in
   let man = [] in
-  Term.info "bap-compare" ~version:"1.6.1" ~doc ~man
+  Term.info "bap-measure-byteweight" ~doc ~man
 
 let () =
   Printexc.record_backtrace true;
