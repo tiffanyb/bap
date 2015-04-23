@@ -399,7 +399,7 @@ Executable "bap-byteweight"
   CompiledObject: best
   BuildDepends:   bap, bap.plugins, cmdliner, fileutils, curl, re.posix
 
-Executable "bap-compare"
+Executable "bap-measure-byteweight"
   Path:           src/readbin
   MainIs:         compare.ml
   Install:        true
