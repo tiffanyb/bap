@@ -72,11 +72,12 @@ let read_addrset filename : Addr.Set.t =
   Addr.Set.t_of_sexp @@ Sexp.load_sexp filename
 
 let write_addrset ?filename (addr_set : Addr.Set.t) : unit =
-  let oc = match filename with
-    | None -> Out_channel.stdout
-    | Some f -> Out_channel.create f in
-  Sexp.output oc (Addr.Set.sexp_of_t addr_set);
-  Out_channel.close oc
+  match filename with
+  | None -> Sexp.output Out_channel.stdout @@ Addr.Set.sexp_of_t addr_set
+  | Some f -> (
+      let oc = Out_channel.create f in
+      Sexp.output oc (Addr.Set.sexp_of_t addr_set);
+      Out_channel.close oc)
 
 let write ?filename (syms : symbol table) : unit =
   let fs_s = Table.foldi syms ~init:Addr.Set.empty ~f:(fun mem _sym fs_set ->
