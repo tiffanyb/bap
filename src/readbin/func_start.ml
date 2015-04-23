@@ -4,17 +4,17 @@ open Or_error
 
 exception Bad_user_input of string
 
-let bap_byteweight bin subcmd =
+let bap_byteweight bin tool =
   let tmp = Filename.temp_file "bw_" ".output" in
-  let cmd = Printf.sprintf "bap-byteweight %s -x %S > %S" subcmd bin tmp in
+  let cmd = Printf.sprintf "bap-byteweight dump -i %s %S > %S" tool bin tmp in
   try
     let _ = Unix.system cmd in
     Symbols.read_addrset tmp
-  with _ -> raise (Bad_user_input subcmd)
+  with _ -> raise (Bad_user_input tool)
 
-let byteweight bin = bap_byteweight bin "find"
+let byteweight bin = bap_byteweight bin "BW"
 
-let symbols bin = bap_byteweight bin "symbols"
+let symbols bin = bap_byteweight bin "SymTbl"
 
 let user = Symbols.read_addrset
 

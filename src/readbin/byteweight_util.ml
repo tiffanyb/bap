@@ -64,48 +64,55 @@ let train meth length comp db paths =
   printf "Signatures are stored in %s\n%!" db;
   Ok ()
 
-let output_sexp img bw length threshold =
-  let fs_set = Table.foldi (Image.sections img) ~init:Addr.Set.empty
-      ~f:(fun mem sec fs_s ->
-          if Section.is_executable sec then
-            let new_fs_s = BW.find bw ~length ~threshold mem in
-            Addr.Set.union fs_s @@ Addr.Set.of_list new_fs_s
-          else fs_s) in
-  Symbols.write_addrset fs_set
-
-let find threshold length comp path print_sexp (input : string) : unit t =
-  Image.create input >>= fun (img,_warns) ->
+let create_bw img path : BW.t t =
   let arch = Image.arch img in
   let data = Signatures.load ?path ~mode:"bytes" arch in
   Result.of_option data
     ~error:(Error.of_string "failed to read signatures from database")
-  >>= fun data ->
-  let bw = Binable.of_string (module BW) data in
-  (* if output sexp, get the addr set and output *)
-  if print_sexp then output_sexp img bw length threshold
-  else
-    Table.iteri (Image.sections img) ~f:(fun mem sec ->
-        if Section.is_executable sec then
-          let start = Memory.min_addr mem in
-          let rec loop n =
-            match BW.next bw ~length ~threshold mem n with
-            | Some n -> printf "%a\n" Addr.ppo Addr.(start ++ n); loop (n+1)
-            | None -> () in
-          loop 0);
+  >>| fun data ->
+  Binable.of_string (module BW) data
+
+let find threshold length path (input : string) : unit t =
+  Image.create input >>= fun (img, _warns) ->
+  create_bw img path >>= fun bw ->
+  Table.iteri (Image.sections img) ~f:(fun mem sec ->
+      if Section.is_executable sec then
+        let start = Memory.min_addr mem in
+        let rec loop n =
+          match BW.next bw ~length ~threshold mem n with
+          | Some n -> printf "%a\n" Addr.ppo Addr.(start ++ n); loop (n+1)
+          | None -> () in
+        loop 0);
   Ok ()
 
-let symbols print_name print_size print_sexp input : unit t =
+let symbols print_name print_size input : unit t =
   Image.create input >>| fun (img,_warns) ->
   let syms = Image.symbols img in
-  if print_sexp then Symbols.write syms
-  else (
-    Table.iteri syms ~f:(fun mem sym ->
-        let addr = Memory.min_addr mem in
-        let name = if print_name then Symbol.name sym else "" in
-        let size = if print_size
-          then sprintf "%4d " (Memory.length mem) else "" in
-        printf "%a %s%s\n" Addr.ppo addr size name);
-    printf "Outputted %d symbols\n" (Table.length syms) )
+  Table.iteri syms ~f:(fun mem sym ->
+      let addr = Memory.min_addr mem in
+      let name = if print_name then Symbol.name sym else "" in
+      let size = if print_size
+        then sprintf "%4d " (Memory.length mem) else "" in
+      printf "%a %s%s\n" Addr.ppo addr size name);
+  printf "Outputted %d symbols\n" (Table.length syms)
+
+let dump _output_format info length threshold path (input : string) : unit t =
+  Image.create input >>= fun (img, _warns) ->
+  match info with
+  | `BW ->
+    create_bw img path >>= fun bw ->
+    let fs_set = Table.foldi (Image.sections img) ~init:Addr.Set.empty
+        ~f:(fun mem sec fs_s ->
+            if Section.is_executable sec then
+              let new_fs_s = BW.find bw ~length ~threshold mem in
+              Addr.Set.union fs_s @@ Addr.Set.of_list new_fs_s
+            else fs_s) in
+    Symbols.write_addrset fs_set;
+    Ok ()
+  | `SymTbl ->
+    let syms = Image.symbols img in
+    Symbols.write syms;
+    Ok ()
 
 let create_parent_dir dst =
   let dir = if Filename.(check_suffix dst dir_sep)
@@ -223,9 +230,21 @@ module Cmdline = struct
     let doc = "Print symbol's size." in
     Arg.(value & flag & info ["print-size"; "s"] ~doc)
 
-  let print_sexp : bool Term.t =
-    let doc = "Print in S-expression." in
-    Arg.(value & flag & info ["print-sexp"; "x"] ~doc)
+  let output_format : [`text | `sexp] Term.t =
+    let enums = ["text", `text; "sexp", `sexp] in
+    let doc = sprintf "The output format. %s" @@ Arg.doc_alts_enum enums in
+    Arg.(value & opt (enum enums) `sexp & info ["output_format"; "f"] ~doc)
+
+  let tool : [`BW | `SymTbl] Term.t =
+    let enums = ["BW", `BW; "SymTbl", `SymTbl] in
+    let doc = sprintf "The info to be dumped. %s" @@ Arg.doc_alts_enum enums in
+    Arg.(value & opt (enum enums) `BW & info ["info"; "i"] ~doc)
+
+  let dump =
+    let doc = "Dump the function starts in a given executable by given tool" in
+    Term.(pure dump $output_format $tool $length $threshold $database_in
+          $filename),
+    Term.info "dump" ~doc
 
   let train =
     let doc = "Train byteweight on the specified set of files" in
@@ -234,7 +253,7 @@ module Cmdline = struct
 
   let find =
     let doc = "Output all function starts in a given executable" in
-    Term.(pure find $threshold $length $compiler $database_in $print_sexp $filename),
+    Term.(pure find $threshold $length $database_in $filename),
     Term.info "find" ~doc
 
   let fetch =
@@ -251,7 +270,7 @@ module Cmdline = struct
 
   let symbols =
     let doc = "Print file's symbol table if any." in
-    Term.(pure symbols $print_name $print_size $print_sexp $filename),
+    Term.(pure symbols $print_name $print_size $filename),
     Term.info "symbols" ~doc
 
   let usage choices =
@@ -273,7 +292,7 @@ module Cmdline = struct
       ~version:Config.pkg_version ~doc ~man
 
   let eval () = Term.eval_choice default
-      [train; find; fetch; install; update; symbols]
+      [train; find; fetch; install; update; symbols; dump]
 end
 
 let () =
