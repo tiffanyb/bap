@@ -5,34 +5,25 @@ open Bap_plugins.Std
 
 exception No_unstripped_file
 
-
-let source_tool = [
-  "BW", `bw;
-  "SymTbl", `symtbl;
-  "User", `user;
-  "Ida", `ida;
-]
-
-let source_gt = [
-  "User", `user;
-  "SymTbl", `symtbl
-]
-
+type result = {
+  tool_name: string;
+  tp: int;
+  fn: int;
+  fp: int;
+  prec: float;
+  recl: float;
+  f_05: float}
 
 let tool : string Term.t =
   let doc = "The source of the function start result that we are going to
-  evaluate. " ^ (Arg.doc_alts_enum source_tool) in
+  evaluate. The default value is bap-byteweight. User can also use
+  \"idaq\", \"idal\", \"idaq64\" or the specific path of IDA. " in
   Arg.(required & pos 0 (some string) (Some "bap-byteweight") & info [] ~docv:"tool" ~doc)
 
 let bin : string Term.t =
   let doc = "The testing stripped binary." in
   Arg.(required & pos 1 (some non_dir_file) None & info [] ~docv:"binary" ~doc)
  
-(* let gt : _ Term.t = *)
-(*   let doc = "The ground truth source. One can direct to a user file or use the symbol *)
-(*   table from unstripped binary (-u required). " ^ (Arg.doc_alts_enum source_gt) in *)
-(*   Arg.(required & pos 2 (some & enum source_gt) (Some `user) & info [] ~docv:"grount truth" ~doc) *)
-
 let gt : string Term.t =
   let doc =
     "The ground truth file. If the ground truth is from symbol table, this
@@ -41,23 +32,6 @@ let gt : string Term.t =
   S-expression format." in
   Arg.(required & pos 2 (some non_dir_file) None
        & info [] ~docv:"ground truth file" ~doc)
-
-(* let symsfile : string option Term.t = *)
-(*   let doc = "The symbol table of binaries. This requires the binaries to use this file as symbols source." in *)
-(*   Arg.(value & opt (some non_dir_file) None & info ["syms"; "s"] *)
-(*          ~docv:"syms" ~doc) *)
-
-(* let unstrip_bin : string option Term.t = *)
-(*   let doc = "The unstripped binary." in *)
-(*   Arg.(value & opt (some non_dir_file) None & info ["unstrip"; "u"] *)
-(*          ~docv:"unstripped_bin" ~doc) *)
-
-(* let use_ida : string option Term.t = *)
-(*   let doc = "Use Ida to extract symbols from file. \ *)
-(*              You can optionally provide path to IDA executable, \ *)
-(*              or executable name." in *)
-(*   Arg.(value & opt (some string) None & info *)
-(*          ["use-ida"] ~doc) *)
 
 let print_metrics : _ list Term.t =
   let opts = [
@@ -73,24 +47,26 @@ let print_metrics : _ list Term.t =
   Arg.(value & opt_all (enum opts) (List.map ~f:snd opts) &
        info ["with-metrics"; "c"] ~doc)
 
-(* let print_source = function *)
-(*   | `bw -> print_endline "bw" *)
-(*   | _ -> print_endline "others" *)
 
-let func_start bin symsfile unstrip_bin use_ida : _ -> Addr.Set.t * string =
-  function
-  | `bw -> Func_start.byteweight bin, "BW"
-  | `user -> (match symsfile with
-      | None -> raise Not_found
-      | Some f -> Func_start.user f, "User")
-  | `symtbl -> (match unstrip_bin with
-      | None -> raise No_unstripped_file
-      | Some b -> Func_start.symbols b, "Symbol")
-  | `ida -> Func_start.ida ?use_ida bin, "IDA"
+let print {tool_name;fp;fn;tp;prec;recl;f_05} print_metrics =
+      (* print out the metrics *)
+    let headers, items =
+      let rev_hd, rev_it = List.fold print_metrics ~init:(["Tool"], [tool_name])
+          ~f:(fun (headers, items) -> function
+              | `with_prec -> "Prcs"::headers, (Printf.sprintf "%.2g" prec)::items
+              | `with_recl -> "Rcll"::headers, (Printf.sprintf "%.2g" recl)::items
+              | `with_F -> "F_05"::headers, (Printf.sprintf "%.2g" f_05)::items
+              | `with_TP -> "TP"::headers, (Printf.sprintf "%d" tp)::items
+              | `with_FN -> "FN"::headers, (Printf.sprintf "%d" fn)::items
+              | `with_FP -> "FP"::headers, (Printf.sprintf "%d" fp)::items ) in
+      List.rev rev_hd, List.rev rev_it in
+    Printf.printf "%s\n%s\n" (String.concat ~sep:"\t" headers)
+      (String.concat ~sep:"\t" items)
+
 
 let compare tool bin gt print_metrics : unit = try
-    let fs_tool, tool_name = func_start bin symsfile unstrip_bin use_ida tool in
-    let fs_gt, _ = func_start bin symsfile unstrip_bin use_ida gt in
+    let fs_tool, tool_name = Func_start.eval ~tool ~testbin:bin in
+    let fs_gt = Ground_truth.with_file ~filename:gt ~testbin:bin in
     let fp =
       let set = Set.diff fs_tool fs_gt in
       Set.length set in
@@ -105,19 +81,8 @@ let compare tool bin gt print_metrics : unit = try
       f_tp /. (f_tp +. f_fp), f_tp /. (f_tp +. f_fn) in
     let f_05 = 1.5 *. prec *. recl /. (0.5 *. prec +. recl) in
 
-    (* print out the metrics *)
-    let headers, items =
-      let rev_hd, rev_it = List.fold print_metrics ~init:(["Tool"], [tool_name])
-          ~f:(fun (headers, items) -> function
-              | `with_prec -> "Prcs"::headers, (Printf.sprintf "%.2g" prec)::items
-              | `with_recl -> "Rcll"::headers, (Printf.sprintf "%.2g" recl)::items
-              | `with_F -> "F_05"::headers, (Printf.sprintf "%.2g" f_05)::items
-              | `with_TP -> "TP"::headers, (Printf.sprintf "%d" tp)::items
-              | `with_FN -> "FN"::headers, (Printf.sprintf "%d" fn)::items
-              | `with_FP -> "FP"::headers, (Printf.sprintf "%d" fp)::items ) in
-      List.rev rev_hd, List.rev rev_it in
-    Printf.printf "%s\n%s\n" (String.concat ~sep:"\t" headers)
-      (String.concat ~sep:"\t" items)
+    print {tool_name;fp;fn;tp;prec;recl;f_05} print_metrics
+      
   with
   | Func_start.Bad_user_input tool ->
     Printf.printf "bap-byteweight dump %s command does not \

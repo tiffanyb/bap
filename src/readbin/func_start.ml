@@ -12,9 +12,9 @@ let bap_byteweight bin tool =
     Symbols.read_addrset tmp
   with _ -> raise (Bad_user_input tool)
 
-let byteweight bin = bap_byteweight bin "BW"
+let byteweight bin = bap_byteweight bin "byteweight"
 
-let symbols bin = bap_byteweight bin "SymTbl"
+let symbols bin = bap_byteweight bin "symbols"
 
 let user = Symbols.read_addrset
 
@@ -34,3 +34,7 @@ let ida ?use_ida bin : Addr.Set.t =
   | Ok l -> l
   | Error err -> Printf.printf "IDA Error: %s\n" @@ Error.to_string_hum err;
     Addr.Set.empty
+
+let eval ~tool ~testbin : Addr.Set.t * string = match tool with
+  | "bap-byteweight" -> byteweight testbin, "BW"
+  | i -> ida ?use_ida:(Some i) testbin, "IDA"
