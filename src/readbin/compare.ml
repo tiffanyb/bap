@@ -5,11 +5,8 @@ open Bap_plugins.Std
 
 exception No_unstripped_file
 
-let print_source = function
-  | `bw -> print_endline "bw"
-  | _ -> print_endline "others"
 
-let source = [
+let source_tool = [
   "BW", `bw;
   "SymTbl", `symtbl;
   "User", `user;
@@ -21,32 +18,46 @@ let source_gt = [
   "SymTbl", `symtbl
 ]
 
-let tool : _ Term.t =
+
+let tool : string Term.t =
   let doc = "The source of the function start result that we are going to
-  evaluate. " ^ (Arg.doc_alts_enum source) in
-  Arg.(value & pos 1 (enum source) `bw & info [] ~docv:"tool" ~doc)
+  evaluate. " ^ (Arg.doc_alts_enum source_tool) in
+  Arg.(required & pos 0 (some string) (Some "bap-byteweight") & info [] ~docv:"tool" ~doc)
 
-let gt : _ Term.t =
-  let doc = "The ground truth source. One can direct to a user file or use the symbol
-  table from unstripped binary (-u required). " ^ (Arg.doc_alts_enum source_gt) in
-  Arg.(value & pos 2 (enum source_gt) `symtbl & info [] ~docv:"gt" ~doc)
+let bin : string Term.t =
+  let doc = "The testing stripped binary." in
+  Arg.(required & pos 1 (some non_dir_file) None & info [] ~docv:"binary" ~doc)
+ 
+(* let gt : _ Term.t = *)
+(*   let doc = "The ground truth source. One can direct to a user file or use the symbol *)
+(*   table from unstripped binary (-u required). " ^ (Arg.doc_alts_enum source_gt) in *)
+(*   Arg.(required & pos 2 (some & enum source_gt) (Some `user) & info [] ~docv:"grount truth" ~doc) *)
 
-let symsfile : string option Term.t =
-  let doc = "The symbol table of binaries. This requires the binaries to use this file as symbols source." in
-  Arg.(value & opt (some non_dir_file) None & info ["syms"; "s"]
-         ~docv:"syms" ~doc)
+let gt : string Term.t =
+  let doc =
+    "The ground truth file. If the ground truth is from symbol table, this
+  file should be an unstripped binary. If the ground truth is from
+  user's input, this file should be a file with content in
+  S-expression format." in
+  Arg.(required & pos 2 (some non_dir_file) None
+       & info [] ~docv:"ground truth file" ~doc)
 
-let unstrip_bin : string option Term.t =
-  let doc = "The unstripped binary." in
-  Arg.(value & opt (some non_dir_file) None & info ["unstrip"; "u"]
-         ~docv:"unstripped_bin" ~doc)
+(* let symsfile : string option Term.t = *)
+(*   let doc = "The symbol table of binaries. This requires the binaries to use this file as symbols source." in *)
+(*   Arg.(value & opt (some non_dir_file) None & info ["syms"; "s"] *)
+(*          ~docv:"syms" ~doc) *)
 
-let use_ida : string option Term.t =
-  let doc = "Use Ida to extract symbols from file. \
-             You can optionally provide path to IDA executable, \
-             or executable name." in
-  Arg.(value & opt (some string) None & info
-         ["use-ida"] ~doc)
+(* let unstrip_bin : string option Term.t = *)
+(*   let doc = "The unstripped binary." in *)
+(*   Arg.(value & opt (some non_dir_file) None & info ["unstrip"; "u"] *)
+(*          ~docv:"unstripped_bin" ~doc) *)
+
+(* let use_ida : string option Term.t = *)
+(*   let doc = "Use Ida to extract symbols from file. \ *)
+(*              You can optionally provide path to IDA executable, \ *)
+(*              or executable name." in *)
+(*   Arg.(value & opt (some string) None & info *)
+(*          ["use-ida"] ~doc) *)
 
 let print_metrics : _ list Term.t =
   let opts = [
@@ -62,9 +73,9 @@ let print_metrics : _ list Term.t =
   Arg.(value & opt_all (enum opts) (List.map ~f:snd opts) &
        info ["with-metrics"; "c"] ~doc)
 
-let bin : string Term.t =
-  let doc = "The testing stripped binary." in
-  Arg.(required & pos 0 (some non_dir_file) None & info [] ~docv:"binary" ~doc)
+(* let print_source = function *)
+(*   | `bw -> print_endline "bw" *)
+(*   | _ -> print_endline "others" *)
 
 let func_start bin symsfile unstrip_bin use_ida : _ -> Addr.Set.t * string =
   function
@@ -77,7 +88,7 @@ let func_start bin symsfile unstrip_bin use_ida : _ -> Addr.Set.t * string =
       | Some b -> Func_start.symbols b, "Symbol")
   | `ida -> Func_start.ida ?use_ida bin, "IDA"
 
-let compare bin print_metrics tool gt symsfile unstrip_bin use_ida : unit = try
+let compare tool bin gt print_metrics : unit = try
     let fs_tool, tool_name = func_start bin symsfile unstrip_bin use_ida tool in
     let fs_gt, _ = func_start bin symsfile unstrip_bin use_ida gt in
     let fp =
@@ -116,8 +127,7 @@ let compare bin print_metrics tool gt symsfile unstrip_bin use_ida : unit = try
     Printf.printf "Cannot get symbole table: No unstripped file found. Did you
     provide unstripped binary by -u?\n"
 
-let compare_t = Term.(pure compare $bin $print_metrics $tool $gt $symsfile
-                      $unstrip_bin $use_ida)
+let compare_t = Term.(pure compare $tool $bin $gt $print_metrics)
 
 let info =
   let doc = "to compare the functions start identification result to the ground
