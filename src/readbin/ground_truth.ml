@@ -19,7 +19,7 @@ let from_symbol_file filename ~testbin : Addr.Set.t =
       let arch = Image.arch img in
       Table.foldi (Image.sections img) ~init:Addr.Set.empty
         ~f:(fun mem sec t_fs ->
-            if Section.is_executable sec then
+            if Image.Sec.is_executable sec then
               let sym_tbl = In_channel.with_file filename
                   ~f:(fun ic -> Symbols.read ic arch mem) in
               Seq.fold ~init:t_fs (Table.regions sym_tbl)

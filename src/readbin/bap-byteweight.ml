@@ -13,7 +13,7 @@ let ignored = [
   ];
 ]
 
-module BW = Byteweight.Bytes
+module BW = Bap.Std.Byteweight.Bytes
 
 let train_on_file meth length db path : unit t =
   Image.create path >>| fun (img,warns) ->
@@ -28,7 +28,7 @@ let train_on_file meth length db path : unit t =
         Binable.of_string (module BW) s
       | _ -> BW.create () in
   Table.iteri (Image.sections img) ~f:(fun mem sec ->
-      if Section.is_executable sec then
+      if Image.Sec.is_executable sec then
         BW.train bw ~max_length:length test mem);
   let data = Binable.to_string (module BW) bw in
   Signatures.save ~mode:"bytes" ~path:db arch data
@@ -72,11 +72,11 @@ let create_bw img path : BW.t t =
   >>| fun data ->
   Binable.of_string (module BW) data
 
-let find threshold length path (input : string) : unit t =
-  Image.create input >>= fun (img, _warns) ->
+let find threshold length comp path input : unit t =
+  Image.create input >>= fun (img,_warns) ->
   create_bw img path >>= fun bw ->
   Table.iteri (Image.sections img) ~f:(fun mem sec ->
-      if Section.is_executable sec then
+      if Image.Sec.is_executable sec then
         let start = Memory.min_addr mem in
         let rec loop n =
           match BW.next bw ~length ~threshold mem n with
@@ -90,7 +90,7 @@ let symbols print_name print_size input : unit t =
   let syms = Image.symbols img in
   Table.iteri syms ~f:(fun mem sym ->
       let addr = Memory.min_addr mem in
-      let name = if print_name then Symbol.name sym else "" in
+      let name = if print_name then Image.Sym.name sym else "" in
       let size = if print_size
         then sprintf "%4d " (Memory.length mem) else "" in
       printf "%a %s%s\n" Addr.ppo addr size name);
@@ -103,7 +103,7 @@ let dump _output_format info length threshold path (input : string) : unit t =
     create_bw img path >>= fun bw ->
     let fs_set = Table.foldi (Image.sections img) ~init:Addr.Set.empty
         ~f:(fun mem sec fs_s ->
-            if Section.is_executable sec then
+            if Image.Sec.is_executable sec then
               let new_fs_s = BW.find bw ~length ~threshold mem in
               Addr.Set.union fs_s @@ Addr.Set.of_list new_fs_s
             else fs_s) in
@@ -119,6 +119,7 @@ let create_parent_dir dst =
     then dst else Filename.dirname dst in
   FileUtil.mkdir ~parent:true dir
 
+
 let fetch fname url =
   let tmp,fd = Filename.open_temp_file "bap_" ".sigs" in
   let write s = Out_channel.output_string fd s; String.length s in
@@ -126,6 +127,7 @@ let fetch fname url =
   Curl.set_writefunction conn (write);
   Curl.set_failonerror conn true;
   Curl.set_followlocation conn true;
+  Curl.set_sslverifypeer conn false;
   Curl.set_url conn url;
   Curl.perform conn;
   Curl.cleanup conn;
@@ -212,7 +214,6 @@ module Cmdline = struct
   let src : string Term.t =
     Arg.(value & pos 0 non_dir_file "sigs.zip" & info []
            ~doc:"Signatures file" ~docv:"SRC")
-
   let dst : string Term.t =
     Arg.(value & pos 1 string Signatures.default_path &
          info [] ~doc:"Destination" ~docv:"DST")
@@ -252,7 +253,7 @@ module Cmdline = struct
 
   let find =
     let doc = "Output all function starts in a given executable" in
-    Term.(pure find $threshold $length $database_in $filename),
+    Term.(pure find $threshold $length $compiler $database_in $filename),
     Term.info "find" ~doc
 
   let fetch =
@@ -283,7 +284,7 @@ module Cmdline = struct
     let doc = "Byteweight Toolkit" in
     let man = [
       `S "DESCRIPTION";
-      `P "bap-byteweight is a toolkit for training, fetching, testing \
+      `P "bap-byteweight is a toolkit for training, fetching, testing\
           and installing byteweight signatures."
     ] in
     Term.(pure usage $ choice_names),

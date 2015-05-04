@@ -1,1 +1,1 @@
-(*bap-compare*)
+(*fsi-benchmark*)
