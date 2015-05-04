@@ -394,14 +394,14 @@ Executable "bap"
 
 Executable "bap-byteweight"
   Path:           src/readbin
-  MainIs:         byteweight_util.ml
+  MainIs:         bap-byteweight.ml
   Install:        true
   CompiledObject: best
   BuildDepends:   bap, bap.plugins, cmdliner, fileutils, curl, re.posix
 
-Executable "bap-measure-byteweight"
+Executable "bap-fsi-benchmark"
   Path:           src/readbin
-  MainIs:         compare.ml
+  MainIs:         fsi_benchmark.ml
   Install:        true
   CompiledObject: best
   BuildDepends:   bap, bap.plugins, cmdliner, re.posix, fileutils
