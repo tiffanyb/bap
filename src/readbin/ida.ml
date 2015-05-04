@@ -20,7 +20,6 @@ let system cmd =
   let return = Sys.command cmd in
   if return = 0 then ()
   else raise (Cmderr cmd)
-
 let pread cmd = Printf.ksprintf run cmd
 let shell cmd = Printf.ksprintf (fun cmd () -> system cmd) cmd
 
@@ -94,7 +93,7 @@ let is_headless = function
   | None -> false
 
 let create_exn ?ida target =
-  let curses = if Sys.os_type = "Unix" && is_headless ida
+  let curses = if Config.system = "linux" && is_headless ida
     then find_curses () else None in
   let ida = match ida with
     | Some path -> path
@@ -146,7 +145,8 @@ let run_script self script_to =
 
 let get_symbols ?demangle t arch mem =
   let result = run_script t Idapy.extract_symbols in
-  Symbols.read ?demangle ~filename:result arch mem
+  In_channel.with_file result ~f:(fun ic ->
+    Symbols.read ?demangle ic arch mem)
 
 let close self = self.close ()
 

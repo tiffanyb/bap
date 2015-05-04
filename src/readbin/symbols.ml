@@ -77,33 +77,30 @@ let read ?demangle ic arch base : string table =
     | None -> name
     | Some how -> demangle_name ~how name in
   let sym_of_sexp x = <:of_sexp<string * int64 * int64>> x in
-  In_channel.with_file filename ~f:(fun out ->
-      let buf = Lexing.from_channel out in
-      Sexp.scan_fold_sexps buf ~init:Table.empty ~f:(fun syms sexp ->
-          try
-            let (name,es,ef) = sym_of_sexp sexp in
-            let words = Int64.(ef - es |> to_int_exn) in
-            let width = Arch.addr_size arch |> Size.to_bits in
-            let from = Addr.of_int64 ~width es in
-            let mem = Memory.view ~from ~words base |> ok_exn in
-            let name = demangle name in
-            Table.add syms mem name |> ok_exn
-          with _exn -> syms))
+  let buf = Lexing.from_channel ic in
+  Sexp.scan_fold_sexps buf ~init:Table.empty ~f:(fun syms sexp ->
+      try
+        let (name,es,ef) = sym_of_sexp sexp in
+        let words = Int64.(ef - es |> to_int_exn) in
+        let width = Arch.addr_size arch |> Size.to_bits in
+        let from = Addr.of_int64 ~width es in
+        let mem = Memory.view ~from ~words base |> ok_exn in
+        let name = demangle name in
+        Table.add syms mem name |> ok_exn
+      with _exn -> syms)
 
-let read_addrset filename : Addr.Hash_set.t =
-  let ic = In_channel.create filename in
-  let set_string = In_channel.input_all ic in
-  Addr.Hash_set.t_of_sexp @@ Sexp.of_string set_string
+(* let read_addrset filename : Addr.Set.t = *)
+(*   Addr.Set.t_of_sexp @@ Sexp.load_sexp filename *)
 
-let write_addrset ?filename (addr_set : Addr.Hash_set.t) : unit =
-  let oc = match filename with
-    | None -> Out_channel.stdout
-    | Some f -> Out_channel.create f in
-  Out_channel.output_string oc @@ Sexp.to_string (Addr.Hash_set.sexp_of_t addr_set);
-  Out_channel.close oc
+let read_addrset ic : Addr.Set.t =
+  Addr.Set.t_of_sexp @@ Sexp.input_sexp ic
 
-let write ?filename (syms : symbol table) : unit =
-  let fs_l = Table.foldi syms ~init:[] ~f:(fun mem _sym fs_list ->
+
+let write_addrset oc (addr_set : Addr.Set.t) : unit =
+  Sexp.output oc @@ Addr.Set.sexp_of_t addr_set
+
+let write oc (syms : symbol table) : unit =
+  let fs_s = Table.foldi syms ~init:Addr.Set.empty ~f:(fun mem _sym fs_set ->
       let addr = Memory.min_addr mem in
-      addr::fs_list) in
-  write_addrset ?filename @@ Addr.Hash_set.of_list fs_l
+      Addr.Set.add fs_set addr) in
+  write_addrset oc fs_s
