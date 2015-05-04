@@ -9,6 +9,8 @@
 open Bap.Std
 open Core_kernel.Std
 
+exception Cmderr of string
+
 (** IDA instance  *)
 type t
 

@@ -3,7 +3,9 @@ open Cmdliner
 open Bap.Std
 open Bap_plugins.Std
 
-exception No_unstripped_file
+type gt_format = [ 
+  | `unstripped_bin
+  | `symbol_file ]
 
 type result = {
   tool_name: string;
@@ -15,9 +17,11 @@ type result = {
   f_05: float}
 
 let tool : string Term.t =
-  let doc = "The source of the function start result that we are going to
-  evaluate. The default value is bap-byteweight. User can also use
-  \"idaq\", \"idal\", \"idaq64\" or the specific path of IDA. " in
+  let doc = "The tool of the function start result that we are going to
+  evaluate. If user wants to evaluate bap-byteweight, one can use
+  \"bap-byteweight\". If user want to evaluate IDA, one can use
+  \"idaq\", \"idal\", \"idaq64\" or the specific path of IDA. The
+  default value is \"bap-byteweight\". " in
   Arg.(required & pos 0 (some string) (Some "bap-byteweight") & info [] ~docv:"tool" ~doc)
 
 let bin : string Term.t =
@@ -26,12 +30,13 @@ let bin : string Term.t =
  
 let gt : string Term.t =
   let doc =
-    "The ground truth file. If the ground truth is from symbol table, this
-  file should be an unstripped binary. If the ground truth is from
-  user's input, this file should be a file with content in
-  S-expression format." in
+    "The ground truth. The ground truth can be an unstripped
+  binary, or a .scm file with symbol information. In .scm file, each symbol should
+  be in format of:
+  ([symbol name] [symbol start address] [symbol end address]), e.g.
+  (malloc@@GLIBC_2.4 0x11034 0x11038)" in
   Arg.(required & pos 2 (some non_dir_file) None
-       & info [] ~docv:"ground truth file" ~doc)
+       & info [] ~docv:"ground-truth" ~doc)
 
 let print_metrics : _ list Term.t =
   let opts = [
@@ -46,7 +51,6 @@ let print_metrics : _ list Term.t =
   -cF_measure, -cTP, -cFP and -cFN." in
   Arg.(value & opt_all (enum opts) (List.map ~f:snd opts) &
        info ["with-metrics"; "c"] ~doc)
-
 
 let print {tool_name;fp;fn;tp;prec;recl;f_05} print_metrics =
       (* print out the metrics *)
@@ -64,9 +68,16 @@ let print {tool_name;fp;fn;tp;prec;recl;f_05} print_metrics =
       (String.concat ~sep:"\t" items)
 
 
+let get_format f =
+  if Filename.check_suffix f ".scm" then `symbol_file
+  else `unstripped_bin
+
+
 let compare tool bin gt print_metrics : unit = try
     let fs_tool, tool_name = Func_start.eval ~tool ~testbin:bin in
-    let fs_gt = Ground_truth.with_file ~filename:gt ~testbin:bin in
+    let fs_gt = match get_format gt with
+      | `unstripped_bin -> Ground_truth.from_unstripped_bin gt
+      | `symbol_file -> Ground_truth.from_symbol_file gt ~testbin:bin in
     let fp =
       let set = Set.diff fs_tool fs_gt in
       Set.length set in
@@ -84,14 +95,11 @@ let compare tool bin gt print_metrics : unit = try
     print {tool_name;fp;fn;tp;prec;recl;f_05} print_metrics
       
   with
-  | Func_start.Bad_user_input tool ->
-    Printf.printf "bap-byteweight dump %s command does not \
-                   work properly.\n" tool
-  | Not_found -> Printf.printf "No Symbol File found.\n"
-  | No_unstripped_file ->
-    Printf.printf "Cannot get symbole table: No unstripped file found. Did you
-    provide unstripped binary by -u?\n"
-
+  | Func_start.External_cmderr cmd ->
+    Printf.printf
+      "Function start is not recognized properly due to the following
+  command cannot be executed properly: \n %s\n" cmd
+  
 let compare_t = Term.(pure compare $tool $bin $gt $print_metrics)
 
 let info =
