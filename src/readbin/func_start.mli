@@ -2,14 +2,7 @@ open Bap.Std
 open Core_kernel.Std
 open Cmdliner
 
-type metrics = {
-  tp: int;
-  fn: int;
-  fp: int;
-  prec: float;
-  recl: float;
-  f_05: float}
-
+type metrics
 
 type print_metrics = [
   | `with_F
@@ -33,6 +26,6 @@ val compare: Addr.Set.t -> Addr.Set.t -> metrics
 (* [of_gt gt ~testbin] given the test binary testbin, returns the *)
 (* function start address from ground truth gt *)
 val of_gt: string -> testbin:string -> Addr.Set.t Or_error.t
-    
+
 (* [of_tool tool] returns the function start address from tool *)
 val of_tool: string -> testbin:string -> Addr.Set.t Or_error.t
