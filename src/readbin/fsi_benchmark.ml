@@ -3,19 +3,6 @@ open Cmdliner
 open Bap.Std
 open Bap_plugins.Std
 
-type gt_format = [ 
-  | `unstripped_bin
-  | `symbol_file ]
-
-type result = {
-  tool_name: string;
-  tp: int;
-  fn: int;
-  fp: int;
-  prec: float;
-  recl: float;
-  f_05: float}
-
 let tool : string Term.t =
   let doc = "The tool of the function start result that we are going to
   evaluate. If user wants to evaluate bap-byteweight, one can use
@@ -26,7 +13,7 @@ let tool : string Term.t =
 let bin : string Term.t =
   let doc = "The testing stripped binary." in
   Arg.(required & pos 1 (some non_dir_file) None & info [] ~docv:"binary" ~doc)
- 
+
 let gt : string Term.t =
   let doc =
     "The ground truth. The ground truth can be an unstripped
@@ -37,7 +24,7 @@ let gt : string Term.t =
   Arg.(required & pos 2 (some non_dir_file) None
        & info [] ~docv:"ground-truth" ~doc)
 
-let print_metrics : _ list Term.t =
+let print_metrics : Func_start.print_metrics list Term.t =
   let opts = [
     "precision", `with_prec;
     "recall", `with_recl;
@@ -51,51 +38,18 @@ let print_metrics : _ list Term.t =
   Arg.(value & opt_all (enum opts) (List.map ~f:snd opts) &
        info ["with-metrics"; "c"] ~doc)
 
-let print {tool_name;fp;fn;tp;prec;recl;f_05} print_metrics =
-  let headers, items =
-    let rev_hd, rev_it = List.fold print_metrics ~init:(["Tool"], [tool_name])
-        ~f:(fun (headers, items) -> function
-            | `with_prec -> "Prcs"::headers, (Printf.sprintf "%.2g" prec)::items
-            | `with_recl -> "Rcll"::headers, (Printf.sprintf "%.2g" recl)::items
-            | `with_F -> "F_05"::headers, (Printf.sprintf "%.2g" f_05)::items
-            | `with_TP -> "TP"::headers, (Printf.sprintf "%d" tp)::items
-            | `with_FN -> "FN"::headers, (Printf.sprintf "%d" fn)::items
-            | `with_FP -> "FP"::headers, (Printf.sprintf "%d" fp)::items ) in
-    List.rev rev_hd, List.rev rev_it in
-  Printf.printf "%s\n%s\n" (String.concat ~sep:"\t" headers)
-    (String.concat ~sep:"\t" items)
-    
-
-let get_format f =
-  if Filename.check_suffix f ".scm" then `symbol_file
-  else `unstripped_bin
+let compare tool bin gt print_metrics : unit =
+  let open Or_error in
+  match (Func_start.of_tool tool ~testbin:bin >>| fun fs_tool ->
+         Func_start.of_gt gt ~testbin:bin >>| fun fs_gt ->
+         let metrics = Func_start.compare fs_gt fs_tool in
+         Func_start.print tool metrics print_metrics) with
+  | Ok _ -> ()
+  | Error err ->
+    Format.printf "Function start is not recognized properly due to
+  the following error:\n %a" Error.pp err
 
 
-let compare tool bin gt print_metrics : unit = try
-    let fs_tool, tool_name = Func_start.eval ~tool ~testbin:bin in
-    let fs_gt = match get_format gt with
-      | `unstripped_bin -> Ground_truth.from_unstripped_bin gt
-      | `symbol_file -> Ground_truth.from_symbol_file gt ~testbin:bin in
-    let fp =
-      let set = Set.diff fs_tool fs_gt in
-      Set.length set in
-    let fn =
-      let set = Set.diff fs_gt fs_tool in
-      Set.length set in
-    let tp = Set.length fs_gt - fn in
-    let prec, recl =
-      let f_fp = float fp in
-      let f_fn = float fn in
-      let f_tp = float tp in
-      f_tp /. (f_tp +. f_fp), f_tp /. (f_tp +. f_fn) in
-    let f_05 = 1.5 *. prec *. recl /. (0.5 *. prec +. recl) in
-    print {tool_name;fp;fn;tp;prec;recl;f_05} print_metrics
-  with
-  | Func_start.External_cmderr cmd ->
-    Printf.printf
-      "Function start is not recognized properly due to the following
-  command cannot be executed properly: \n %s\n" cmd
-  
 let compare_t = Term.(pure compare $tool $bin $gt $print_metrics)
 
 let info =
