@@ -3,6 +3,23 @@ open Cmdliner
 open Bap.Std
 open Bap_plugins.Std
 
+type metrics = [
+  | `with_F
+  | `with_FN
+  | `with_FP
+  | `with_TP
+  | `with_prec
+  | `with_recl
+]
+
+type evaluation = {
+  true_positive: int;
+  false_negative: int;
+  false_positive: int;
+  prec: float;
+  recl: float;
+  f_05: float}
+
 let tool : string Term.t =
   let doc = "The tool of the function start result that we are going to
   evaluate. If user wants to evaluate bap-byteweight, one can use
@@ -24,7 +41,7 @@ let truth : string Term.t =
   Arg.(required & pos 2 (some non_dir_file) None
        & info [] ~docv:"ground-truth" ~doc)
 
-let print_metrics : Func_start.print_metrics list Term.t =
+let print_metrics : metrics list Term.t =
   let opts = [
     "precision", `with_prec;
     "recall", `with_recl;
@@ -38,12 +55,49 @@ let print_metrics : Func_start.print_metrics list Term.t =
   Arg.(value & opt_all (enum opts) (List.map ~f:snd opts) &
        info ["with-metrics"; "c"] ~doc)
 
-let compare_against tool bin truth print_metrics : unit =
+let output_metric_value oc {false_positive;false_negative;
+                            true_positive;prec;recl;f_05} metrics : unit =
+  let output_ratio = fprintf oc "\t%.2g" in
+  let output_int = fprintf oc "\t%d" in
+  List.iter metrics ~f:(function
+      | `with_prec -> output_ratio prec
+      | `with_recl -> output_ratio recl
+      | `with_F -> output_ratio f_05
+      | `with_TP -> output_int true_positive
+      | `with_FN -> output_int false_negative
+      | `with_FP -> output_int false_positive);
+  fprintf oc "\n"
+
+let string_of_metric = function
+  | `with_prec -> "Prcs"
+  | `with_recl -> "Rcll"
+  | `with_F -> "F_05"
+  | `with_TP -> "TP"
+  | `with_FN -> "FN"
+  | `with_FP -> "FP"
+
+let print oc tool result print_metrics : unit =
+  let tool_name = if tool = "bap-byteweight" then "BW" else "IDA" in
+  fprintf oc "Tool";
+  List.iter print_metrics ~f:(fun m -> Printf.fprintf oc "\t%s"
+                               @@ string_of_metric m);
+  fprintf oc "\n%s" tool_name;
+  output_metric_value oc result print_metrics
+
+let compare_against tool_name bin truth_name print_metrics : unit =
   let open Or_error in
-  match (Func_start.of_tool tool ~testbin:bin >>| fun fs_tool ->
-         Func_start.of_gt truth ~testbin:bin >>| fun fs_gt ->
-         let metrics = Func_start.compare_against ~truth:fs_gt fs_tool in
-         Func_start.print tool metrics print_metrics) with
+  match (Func_start.of_tool tool_name ~testbin:bin >>| fun tool ->
+         Func_start.of_truth truth_name ~testbin:bin >>| fun truth ->
+         let result =
+           let false_positive = Set.(length (diff tool truth)) in
+           let false_negative = Set.(length (diff truth tool)) in
+           let true_positive = Set.length truth - false_negative in
+           let ratio x = Float.(of_int true_positive / (of_int true_positive + of_int x)) in
+           let prec = ratio false_positive in
+           let recl = ratio false_negative in
+           let f_05 = 1.5 *. prec *. recl /. (0.5 *. prec +. recl) in
+           {false_positive;false_negative;true_positive;prec;recl;f_05} in
+         print stdout tool_name result print_metrics) with
   | Ok _ -> ()
   | Error err ->
     Format.printf "Function start is not recognized properly due to
