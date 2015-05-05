@@ -17,9 +17,7 @@ let run cmd =
   In_channel.close inp; r
 
 let system cmd =
-  let return = Sys.command cmd in
-  if return = 0 then ()
-  else raise (Cmderr cmd)
+  if Sys.command cmd <> 0 then raise (Cmderr cmd)
 let pread cmd = Printf.ksprintf run cmd
 let shell cmd = Printf.ksprintf (fun cmd () -> system cmd) cmd
 
