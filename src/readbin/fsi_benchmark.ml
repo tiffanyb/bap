@@ -38,11 +38,11 @@ let print_metrics : Func_start.print_metrics list Term.t =
   Arg.(value & opt_all (enum opts) (List.map ~f:snd opts) &
        info ["with-metrics"; "c"] ~doc)
 
-let compare tool bin truth print_metrics : unit =
+let compare_against tool bin truth print_metrics : unit =
   let open Or_error in
   match (Func_start.of_tool tool ~testbin:bin >>| fun fs_tool ->
          Func_start.of_gt truth ~testbin:bin >>| fun fs_gt ->
-         let metrics = Func_start.compare fs_gt fs_tool in
+         let metrics = Func_start.compare_against ~truth:fs_gt fs_tool in
          Func_start.print tool metrics print_metrics) with
   | Ok _ -> ()
   | Error err ->
@@ -50,7 +50,7 @@ let compare tool bin truth print_metrics : unit =
   the following error:\n %a" Error.pp err
 
 
-let compare_t = Term.(pure compare $tool $bin $truth $print_metrics)
+let compare_against_t = Term.(pure compare_against $tool $bin $truth $print_metrics)
 
 let info =
   let doc = "to compare the functions start identification result to the ground
@@ -61,6 +61,6 @@ let info =
 let () =
   Printexc.record_backtrace true;
   Plugins.load ();
-  match Term.eval ~catch:false (compare_t, info) with
+  match Term.eval ~catch:false (compare_against_t, info) with
   | `Error _ -> exit 1
   | _ -> exit 0

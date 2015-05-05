@@ -36,10 +36,10 @@ let of_tool tool ~testbin : Addr.Set.t Or_error.t =
   then Find_starts.with_byteweight testbin
   else Find_starts.with_ida ~which_ida:tool testbin
 
-let compare fs_tool fs_gt : eval_metrics =
-  let false_positive = Set.(length (diff fs_tool fs_gt)) in
-  let false_negative = Set.(length (diff fs_gt fs_tool)) in
-  let true_positive = Set.length fs_gt - false_negative in
+let compare_against ~truth tool : eval_metrics =
+  let false_positive = Set.(length (diff tool truth)) in
+  let false_negative = Set.(length (diff truth tool)) in
+  let true_positive = Set.length truth - false_negative in
   let ratio x = Float.(of_int true_positive / (of_int true_positive + of_int x)) in
   let prec = ratio false_positive in
   let recl = ratio false_negative in

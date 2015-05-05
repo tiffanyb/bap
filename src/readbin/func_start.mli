@@ -17,11 +17,11 @@ type print_metrics = [
 (* metrics of tool in terms of print_metrics *)
 val print: string -> eval_metrics -> print_metrics list -> unit
 
-(* [compare tool gt] compares the function start result of tool to *)
-(* ground truth gt, and outputs the result to metrics, including true *)
-(* positives, false positives, false negatives, precision, recall, *)
-(* and the f_0.5 measurement *)
-val compare: Addr.Set.t -> Addr.Set.t -> eval_metrics
+(* [compare_against ~truth tool] compares the function start result of *)
+(* result of tool to truth, and outputs the result to metrics, *)
+(* including true positives, false positives, false negatives, *)
+(* precision, recall, and the f_0.5 measurement *)
+val compare_against: truth:Addr.Set.t -> Addr.Set.t -> eval_metrics
 
 (* [of_gt gt ~testbin] given the test binary testbin, returns the *)
 (* function start address from ground truth gt *)
