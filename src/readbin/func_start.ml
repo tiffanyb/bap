@@ -5,7 +5,7 @@ type gt_format = [
   | `unstripped_bin
   | `symbol_file ]
 
-type metrics = {
+type eval_metrics = {
   true_positive: int;
   false_negative: int;
   false_positive: int;
@@ -36,20 +36,13 @@ let of_tool tool ~testbin : Addr.Set.t Or_error.t =
   then Find_starts.with_byteweight testbin
   else Find_starts.with_ida ~which_ida:tool testbin
 
-
-let compare fs_tool fs_gt : metrics =
-  let false_positive =
-    let set = Set.diff fs_tool fs_gt in
-    Set.length set in
-  let false_negative =
-    let set = Set.diff fs_gt fs_tool in
-    Set.length set in
+let compare fs_tool fs_gt : eval_metrics =
+  let false_positive = Set.(length (diff fs_tool fs_gt)) in
+  let false_negative = Set.(length (diff fs_gt fs_tool)) in
   let true_positive = Set.length fs_gt - false_negative in
-  let prec, recl =
-    let f_false_positive = float false_positive in
-    let f_false_negative = float false_negative in
-    let f_true_positive = float true_positive in
-    f_true_positive /. (f_true_positive +. f_false_positive), f_true_positive /. (f_true_positive +. f_false_negative) in
+  let ratio x = Float.(of_int true_positive / (of_int true_positive + of_int x)) in
+  let prec = ratio false_positive in
+  let recl = ratio false_negative in
   let f_05 = 1.5 *. prec *. recl /. (0.5 *. prec +. recl) in
   {false_positive;false_negative;true_positive;prec;recl;f_05}
 
