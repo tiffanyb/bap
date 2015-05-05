@@ -1,8 +1,11 @@
 open Bap.Std
+open Core_kernel.Std
 
-exception External_cmderr of string
 
-(* [eval ~tool ~testbin] evaluates the tool on the testbin binary, and *)
-(* returns the function start address set, and the tool's name for the *)
-(* header of output table *)
-val eval: tool:string -> testbin:string -> Addr.Set.t * string
+(* [with_ida ~whichida testbin] evaluates IDA on the testbin binary, and *)
+(* returns the function start address set *)
+val with_ida: whichida:string -> string -> Addr.Set.t Or_error.t
+
+(* [with_byteweight testbin] evaluates IDA on the testbin binary, and *)
+(* returns the function start address set *)
+val with_byteweight: string -> Addr.Set.t Or_error.t
