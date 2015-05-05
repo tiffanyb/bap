@@ -10,10 +10,10 @@ let with_byteweight bin : Addr.Set.t t =
   else error_string cmd
 
 
-let with_ida ~whichida bin : Addr.Set.t t =
+let with_ida ~which_ida bin : Addr.Set.t t =
   Image.create bin >>= fun (img, _warns) ->
   let arch = Image.arch img in
-  Ida.create ?ida:(Some whichida) bin >>| fun ida ->
+  Ida.create ?ida:(Some which_ida) bin >>| fun ida ->
   Table.foldi (Image.sections img) ~init:Addr.Set.empty ~f:(fun mem sec ida_syms ->
       if Image.Sec.is_executable sec then
         let sym_tbl = Ida.(get_symbols ida arch mem) in

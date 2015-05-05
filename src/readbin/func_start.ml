@@ -1,7 +1,7 @@
 open Bap.Std
 open Core_kernel.Std
 
-type gt_format = [ 
+type gt_format = [
   | `unstripped_bin
   | `symbol_file ]
 
@@ -34,7 +34,7 @@ let of_gt gt ~testbin : Addr.Set.t Or_error.t =  match format_of_filename gt wit
 let of_tool tool ~testbin : Addr.Set.t Or_error.t =
   if tool = "bap-byteweight"
   then Find_starts.with_byteweight testbin
-  else Find_starts.with_ida ~whichida:tool testbin
+  else Find_starts.with_ida ~which_ida:tool testbin
 
 
 let compare fs_tool fs_gt : metrics =
@@ -69,4 +69,4 @@ let print tool {fp;fn;tp;prec;recl;f_05} print_metrics =
     List.rev rev_hd, List.rev rev_it in
   Printf.printf "%s\n%s\n" (String.concat ~sep:"\t" headers)
     (String.concat ~sep:"\t" items)
-    
+
