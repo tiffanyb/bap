@@ -14,7 +14,7 @@ let bin : string Term.t =
   let doc = "The testing stripped binary." in
   Arg.(required & pos 1 (some non_dir_file) None & info [] ~docv:"binary" ~doc)
 
-let gt : string Term.t =
+let truth : string Term.t =
   let doc =
     "The ground truth. The ground truth can be an unstripped
   binary, or a .scm file with symbol information. In .scm file, each symbol should
@@ -38,10 +38,10 @@ let print_metrics : Func_start.print_metrics list Term.t =
   Arg.(value & opt_all (enum opts) (List.map ~f:snd opts) &
        info ["with-metrics"; "c"] ~doc)
 
-let compare tool bin gt print_metrics : unit =
+let compare tool bin truth print_metrics : unit =
   let open Or_error in
   match (Func_start.of_tool tool ~testbin:bin >>| fun fs_tool ->
-         Func_start.of_gt gt ~testbin:bin >>| fun fs_gt ->
+         Func_start.of_gt truth ~testbin:bin >>| fun fs_gt ->
          let metrics = Func_start.compare fs_gt fs_tool in
          Func_start.print tool metrics print_metrics) with
   | Ok _ -> ()
@@ -50,7 +50,7 @@ let compare tool bin gt print_metrics : unit =
   the following error:\n %a" Error.pp err
 
 
-let compare_t = Term.(pure compare $tool $bin $gt $print_metrics)
+let compare_t = Term.(pure compare $tool $bin $truth $print_metrics)
 
 let info =
   let doc = "to compare the functions start identification result to the ground
