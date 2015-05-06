@@ -2,6 +2,7 @@ open Core_kernel.Std
 open Bap.Std
 open Bap_plugins.Std
 open Or_error
+open Format
 
 (** list of posix regexes of files that are ignored during
     training.  *)
@@ -56,7 +57,7 @@ let train meth length comp db paths =
       let r = match train_on_file meth length db path with
         | Ok () -> "OK"
         | Error err ->
-          Format.eprintf "Error: %a\n%!" Error.pp err;
+          eprintf "Error: %a\n%!" Error.pp err;
           (incr errors); "SKIPPED" in
       printf "%6s\n%!" r);
   printf "Processed %d files out of %d in %g seconds\n"
@@ -80,7 +81,7 @@ let find threshold length comp path input : unit t =
         let start = Memory.min_addr mem in
         let rec loop n =
           match BW.next bw ~length ~threshold mem n with
-          | Some n -> printf "%a\n" Addr.ppo Addr.(start ++ n); loop (n+1)
+          | Some n -> printf "%a\n" Addr.pp Addr.(start ++ n); loop (n+1)
           | None -> () in
         loop 0);
   Ok ()
@@ -93,7 +94,7 @@ let symbols print_name print_size input : unit t =
       let name = if print_name then Image.Sym.name sym else "" in
       let size = if print_size
         then sprintf "%4d " (Memory.length mem) else "" in
-      printf "%a %s%s\n" Addr.ppo addr size name);
+      printf "%a %s%s\n" Addr.pp addr size name);
   printf "Outputted %d symbols\n" (Table.length syms)
 
 let dump _output_format info length threshold path (input : string) : unit t =

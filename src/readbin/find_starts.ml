@@ -4,7 +4,7 @@ open Or_error
 
 let with_byteweight bin : Addr.Set.t t =
   let tmp = Filename.temp_file "bw_" ".output" in
-  let cmd = Printf.sprintf "bap-byteweight dump -i byteweight %S > %S" bin tmp in
+  let cmd = sprintf "bap-byteweight dump -i byteweight %S > %S" bin tmp in
   if Sys.command cmd = 0
   then return (In_channel.with_file tmp ~f:Symbols.read_addrset)
   else error_string cmd

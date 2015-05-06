@@ -2,7 +2,7 @@ open Core_kernel.Std
 open Bap.Std
 open Word_size
 
-exception Cmderr of string
+exception External_command_failed of string
 
 type t = {
   ida : string;
@@ -17,9 +17,9 @@ let run cmd =
   In_channel.close inp; r
 
 let system cmd =
-  if Sys.command cmd <> 0 then raise (Cmderr cmd)
-let pread cmd = Printf.ksprintf run cmd
-let shell cmd = Printf.ksprintf (fun cmd () -> system cmd) cmd
+  if Sys.command cmd <> 0 then raise (External_command_failed cmd)
+let pread cmd = ksprintf run cmd
+let shell cmd = ksprintf (fun cmd () -> system cmd) cmd
 
 let ext p e =
   FilePath.(add_extension (chop_extension p) e)

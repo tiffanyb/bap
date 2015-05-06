@@ -2,6 +2,7 @@ open Core_kernel.Std
 open Cmdliner
 open Bap.Std
 open Bap_plugins.Std
+open Format
 
 type metrics = [
   | `with_F
@@ -55,18 +56,17 @@ let print_metrics : metrics list Term.t =
   Arg.(value & opt_all (enum opts) (List.map ~f:snd opts) &
        info ["with-metrics"; "c"] ~doc)
 
-let output_metric_value oc {false_positive;false_negative;
-                            true_positive;prec;recl;f_05} metrics : unit =
-  let output_ratio = fprintf oc "\t%.2g" in
-  let output_int = fprintf oc "\t%d" in
+let output_metric_value formatter r metrics : unit =
+  let output_ratio = fprintf formatter "\t%.2g" in
+  let output_int = fprintf formatter "\t%d" in
   List.iter metrics ~f:(function
-      | `with_prec -> output_ratio prec
-      | `with_recl -> output_ratio recl
-      | `with_F -> output_ratio f_05
-      | `with_TP -> output_int true_positive
-      | `with_FN -> output_int false_negative
-      | `with_FP -> output_int false_positive);
-  fprintf oc "\n"
+      | `with_prec -> output_ratio r.prec
+      | `with_recl -> output_ratio r.recl
+      | `with_F -> output_ratio r.f_05
+      | `with_TP -> output_int r.true_positive
+      | `with_FN -> output_int r.false_negative
+      | `with_FP -> output_int r.false_positive);
+  fprintf formatter "\n"
 
 let string_of_metric = function
   | `with_prec -> "Prcs"
@@ -76,13 +76,13 @@ let string_of_metric = function
   | `with_FN -> "FN"
   | `with_FP -> "FP"
 
-let print oc tool result print_metrics : unit =
+let print formatter tool result print_metrics : unit =
   let tool_name = if tool = "bap-byteweight" then "BW" else "IDA" in
-  fprintf oc "Tool";
-  List.iter print_metrics ~f:(fun m -> Printf.fprintf oc "\t%s"
+  fprintf formatter "Tool";
+  List.iter print_metrics ~f:(fun m -> fprintf formatter "\t%s"
                                @@ string_of_metric m);
-  fprintf oc "\n%s" tool_name;
-  output_metric_value oc result print_metrics
+  fprintf formatter "\n%s" tool_name;
+  output_metric_value formatter result print_metrics
 
 let compare_against tool_name bin truth_name print_metrics : unit =
   let open Or_error in
@@ -97,10 +97,10 @@ let compare_against tool_name bin truth_name print_metrics : unit =
            let recl = ratio false_negative in
            let f_05 = 1.5 *. prec *. recl /. (0.5 *. prec +. recl) in
            {false_positive;false_negative;true_positive;prec;recl;f_05} in
-         print stdout tool_name result print_metrics) with
+         print std_formatter tool_name result print_metrics) with
   | Ok _ -> ()
   | Error err ->
-    Format.printf "Function start is not recognized properly due to
+    printf "Function start is not recognized properly due to
   the following error:\n %a" Error.pp err
 
 
