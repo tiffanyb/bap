@@ -102,7 +102,11 @@ module Kernel(Machine : Primus.Machine.S) = struct
         match Map.find s.dead_heap ptr with
         | Some _ -> violation ptr Double_free >>| fun () -> void
         | None ->
-          add Fields.dead_heap ptr {pos; event = Free size} >>| fun () -> void
+          let n = Value.to_word size |> Word.to_int_exn in
+          Seq.init n ~f:ident |>
+          Machine.Seq.iter ~f:(fun off ->
+            Value.nsucc ptr off >>= fun ptr ->
+          add Fields.dead_heap ptr {pos; event = Free size}) >>| fun () -> void
 
   let check event ptr =
     Machine.Local.get state >>= fun s ->
